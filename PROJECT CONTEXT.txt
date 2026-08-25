@@ -1,0 +1,30 @@
+PROJECT CONTEXT
+
+I am a Data Specialist at a bank, working in Group Forensic Services (GFS). I'm building an internal tool to replace a manual, unreliable paper-based process for managing two shared pool vehicles.
+
+THE PROBLEM THIS SOLVES:
+Currently, staff sign a paper register and separately fill in a logbook (mileage, condition) when taking a pool car. Compliance is inconsistent, so when a vehicle is damaged, there's no reliable way to identify who was responsible. This tool digitises and enforces that process: booking, manager approval, key handover, photographic evidence of vehicle condition, and mileage tracking, all logged with a full audit trail.
+
+WHO USES IT:
+- Employees: request a vehicle, collect the key once approved, log photos and mileage when taking and returning the car
+- Manager: approves/declines requests, confirms key handover and return, reviews incidents (e.g. damage), views analytics and service due dates
+
+WHY THIS MATTERS FOR HOW YOU SHOULD BUILD:
+This is forensic-adjacent, accountability-critical software, even at prototype stage. Please default to:
+- Data integrity over convenience (e.g. no hard deletes of vehicles or bookings, use status/active flags instead, since historical records must remain intact)
+- Explicit validation over silent failure (e.g. reject an action clearly if a required condition isn't met, rather than allowing incomplete data through)
+- Every meaningful state change should be logged to an audit trail, not just stored
+- Clear separation between what a general Employee can see/do versus what a Manager/Admin can see/do, enforced at the backend, not just hidden in the UI
+
+CURRENT STAGE:
+This is a local-only PROTOTYPE, meant to demo the concept to leadership before I request actual cloud infrastructure (Azure SQL, Azure Blob Storage, Azure Entra ID) through IT. Because of this:
+- No cloud services, no external dependencies requiring credentials or accounts I don't have yet
+- SQLite for the database, local file storage for photos, mock login instead of real authentication, and a logged/simulated email notification system instead of real email sending
+- Structure the code so that swapping in the real cloud services later is a small, isolated change (e.g. a single service module), not a rewrite. I will build the production version later using the same structure, once I have the necessary access.
+
+MY BACKGROUND AND PREFERENCES:
+- I'm proficient in Python and SQL, with a background in data engineering and ETL work, so I'm comfortable reading and adjusting backend code directly
+- I prefer clean, minimal project structure, please don't generate unnecessary boilerplate, unused example files, or placeholder pages beyond what's actually specified in the requirements
+- Please ask me clarifying questions before generating code if any requirement is ambiguous, rather than guessing or assuming
+
+I'll now give you a detailed prompt with the specific features and data model to build.

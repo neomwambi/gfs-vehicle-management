@@ -1,0 +1,119 @@
+GFS Vehicle Management System - How to Run (Windows)
+====================================================
+
+PREREQUISITES
+-------------
+- Python installed (this project was set up with):
+  C:\Program Files\Python314\python.exe
+- Project folder:
+  C:\Users\olipa\OneDrive\Documents\Cursor Projects\GFS Vehicle Management System
+
+
+FIRST-TIME SETUP (only once)
+----------------------------
+Open PowerShell and run:
+
+  cd "C:\Users\olipa\OneDrive\Documents\Cursor Projects\GFS Vehicle Management System"
+
+  & "C:\Program Files\Python314\python.exe" -m venv .venv
+
+  .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+  .\.venv\Scripts\python.exe seed.py --reset
+
+
+START THE APP (every time)
+--------------------------
+  cd "C:\Users\olipa\OneDrive\Documents\Cursor Projects\GFS Vehicle Management System"
+
+  .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+
+Leave that terminal open. You should see:
+  Uvicorn running on http://127.0.0.1:8001
+
+Open in Chrome or Edge (NOT by double-clicking HTML files):
+
+  http://127.0.0.1:8001/login.html
+
+NOTE: Port 8000 may be blocked on some Windows machines. Use 8001.
+If you prefer another port, change 8001 in the command and the URL.
+
+
+WHY NOT "activate"?
+-------------------
+PowerShell may block:
+  .\.venv\Scripts\activate
+
+That is fine. Always call the venv Python directly:
+
+  .\.venv\Scripts\python.exe ...
+
+
+RESET DEMO DATA
+---------------
+With the server stopped OR while it is running:
+
+  .\.venv\Scripts\python.exe seed.py --reset
+
+Then refresh the browser and log in again.
+(If login fails after a server restart, just log in again - sessions are in memory.)
+
+
+DEMO USERS
+----------
+  nishen   -> Nishen Singh        (Manager)
+  neo      -> Neo Mwambi          (Admin - same portal as Manager)
+  omphile  -> Omphile Modiba      (Employee)
+  sboniso  -> Sboniso Shoba       (Employee)
+  faiz     -> Faiz Hoosen         (Employee)
+  karish   -> Karish Ramnarayan   (Employee)
+  riyaaz   -> Riyaaz Dadamia      (Employee)
+  leon     -> Leon Pottas         (Employee)
+
+
+TWO PORTALS AT ONCE (Employee + Admin)
+--------------------------------------
+Sessions are per browser profile. Use two windows:
+
+  Window 1 (normal Chrome/Edge):
+    http://127.0.0.1:8001/login.html
+    Log in as Omphile Modiba (Employee)
+    -> Employee app: http://127.0.0.1:8001/app/index.html
+
+  Window 2 (InPrivate / Incognito):
+    http://127.0.0.1:8001/login.html
+    Log in as Nishen Singh (Manager)
+    -> Admin portal: http://127.0.0.1:8001/admin/index.html
+
+Do NOT use two normal tabs in the same browser - they share one login.
+
+
+STOP THE APP
+------------
+In the terminal where uvicorn is running, press:  Ctrl + C
+
+
+RUN TESTS
+---------
+  .\.venv\Scripts\python.exe -m pytest -q
+
+
+TROUBLESHOOTING
+---------------
+- Blank login dropdown / "Loading users…"
+  → You must open http://127.0.0.1:8001/login.html (not a file:// path)
+  → Hard refresh: Ctrl + Shift + R
+
+- Port already in use / access denied on 8000
+  → Use port 8001 (command above)
+
+- Pages empty after login / no vehicles
+  → Hard refresh: Ctrl + Shift + R
+  → Log out and log in again
+  → Confirm server terminal still shows "Uvicorn running"
+
+- "Not authenticated"
+  → Server was restarted (sessions cleared). Log in again.
+
+- Execution policy error on activate
+  → Ignore activate. Use .\.venv\Scripts\python.exe as shown above.

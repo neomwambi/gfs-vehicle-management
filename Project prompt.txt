@@ -1,0 +1,107 @@
+I'm building a PROTOTYPE for a fleet management web app for a bank's internal Group Forensic Services (GFS) team, to demo to leadership before requesting cloud infrastructure. This tracks pool vehicle bookings, manager approval of requests, physical key handover, check-out/check-in with photo evidence, and service scheduling. It handles sensitive forensic-adjacent data, so audit trails and data integrity matter even at prototype stage, since the demo needs to show these controls working, not just the UI.
+
+IMPORTANT: This must run entirely locally, no cloud dependencies, since I don't yet have Azure access. It should be structured so it can migrate to Azure SQL, Azure Blob Storage, and Azure Entra ID later with minimal rework.
+
+WORKFLOW THIS APP SUPPORTS:
+1. User logs in (mock login for now) with a role of either Employee or Manager
+2. Landing page shows both vehicles and their current status (Available, Reserved, In Use, Under Maintenance), and if not Available, who currently has it or has requested it
+3. An Employee requests a vehicle, either immediately or as an advance reservation, providing a Purpose/Reason for the trip and a Destination. This creates a Booking in "Pending Approval" status
+4. A Manager sees pending requests (with reason and destination visible) and can Approve or Reject them
+5. Once Approved, the Employee must collect the key in person from the Manager who approved it. The Manager confirms this in the app (KeyCollected = true, KeyCollectedTimestamp set) before the Employee can proceed to Check-Out. Check-Out must be blocked, both in the UI and at the API level, unless KeyCollected is true
+6. Employee completes Check-Out: photo capture of vehicle condition via camera, odometer/mileage entry, current location
+7. When the vehicle is returned, the Employee completes Check-In: photo capture, mileage, location, optional damage flag. If damage is flagged, an Incident record is automatically created for Manager review
+8. The Manager then confirms the key has been physically returned (KeyReturned = true, KeyReturnedTimestamp set), which closes out the booking
+9. All create/update actions are written to an AuditLog table (who did what, when, old value, new value)
+
+Please scaffold a full-stack Python project with this structure:
+
+BACKEND:
+- FastAPI application
+- SQLAlchemy ORM models for these tables:
+
+Vehicles (VehicleID PK, RegistrationNumber, MakeModel, CurrentStatus, CurrentMileage, CurrentParkingLocation, ServiceIntervalKm, LastServiceMileage, ServiceAlertThresholdKm, LastServiceDate, NextServiceDueDate)
+
+Bookings (BookingID PK, VehicleID FK, DriverID, BookingType [Immediate/Advance Reservation], ReservationStart, ReservationEnd, PurposeReason, Destination, BookingStatus [Pending Approval, Approved, Rejected, Checked Out, Checked In, Flagged, Closed, Cancelled], ApprovedBy, ApprovalTimestamp, KeyCollected (boolean, default false), KeyCollectedTimestamp, KeyReturned (boolean, default false), KeyReturnedTimestamp, CheckOutTimestamp, CheckOutMileage, CheckOutLocation, CheckOutPhotoPaths, CheckInTimestamp, CheckInMileage, CheckInLocation, CheckInPhotoPaths, DamageNoted (boolean), DamageDescription)
+
+Incidents (IncidentID PK, BookingID FK, FlagType, RaisedOn, ReviewedBy, ReviewStatus, ResolutionNotes)
+
+ServiceHistory (ServiceID PK, VehicleID FK, ServiceDate, MileageAtService, ServiceType, Notes, LoggedBy)
+
+TrackerData (TrackerID PK, BookingID FK, TrackedRoute, TrackedStartLocation, TrackedEndLocation, LocationMatch) -- this table can stay empty/unused in the prototype, it's for a future phase
+
+AuditLog (LogID PK, TableName, RecordID, Action, ChangedBy, ChangedAt, OldValue, NewValue)
+
+- SQLite database for local development (structure the SQLAlchemy connection so swapping to Azure SQL later only requires changing the connection string, not the models)
+- Local file system storage for photos (save into an /uploads folder, store the relative path in the Bookings table, not the binary data). Structure this as a separate storage service module so swapping to Azure Blob Storage later only requires changing that one module
+- REST API endpoints for: requesting a booking, approving/rejecting a booking (Manager only), confirming key collected (Manager only), check-out, check-in, confirming key returned (Manager only), listing vehicles with current status, creating incidents, retrieving service due status
+- Every create/update endpoint must write an entry to the AuditLog table
+- Input validation using Pydantic models:
+  - Check-in mileage must be greater than or equal to check-out mileage
+  - Photos required for check-out and check-in
+  - Check-out can only happen if BookingStatus is Approved AND KeyCollected is true
+  - Check-in can only happen if BookingStatus is Checked Out
+  - Approve/reject/key-collected/key-returned actions require the logged-in user to have the Manager role
+  - PurposeReason and Destination are required fields when requesting a booking
+- Simple mock authentication: a login endpoint that accepts a username from a small predefined list of sample users, each with a role (Employee or Manager), returns a session identifier, all subsequent actions use that identity. Structure this as a separate auth module so swapping to Azure Entra ID later only requires changing that one module, not the rest of the app
+
+FRONTEND:
+- Plain HTML/JS with Bootstrap for now (prioritise speed of a working demo over polish)
+- Include a simple branded theme: a header bar with a placeholder logo image tag (I will replace the placeholder image file with Standard Bank's actual logo myself), using a clean, professional blue/white colour scheme
+- Pages:
+  - Login (mock user selector showing role)
+  - Landing page (vehicle status overview: Available/Reserved/In Use/Under Maintenance, current driver if applicable, button to request a car)
+  - Request a car (immediate or advance reservation, with Purpose/Reason and Destination fields)
+  - Manager Approvals view (list of pending requests with reason/destination visible, Approve/Reject buttons)
+  - Manager Key Handover view (list of approved bookings awaiting key collection, button to confirm handed over)
+  - Check-out flow (camera capture via getUserMedia, not file upload, mileage entry, location)
+  - Check-in flow (same, plus damage toggle and conditional damage description field)
+  - Manager Key Return view (list of checked-in bookings awaiting key return confirmation)
+  - My Trips history (Employee's own past bookings)
+  - Simple admin page to add a vehicle
+- Camera capture should use the browser's getUserMedia API directly, not a file picker, to preserve evidence integrity
+
+PROJECT SETUP:
+- requirements.txt and README with local setup instructions (how to run it, how to reset the database with sample data)
+- A seed script populating the database with realistic anonymised dummy data:
+  - 2 sample vehicles (different make/models, one with CurrentMileage close to its service due point, to test the service alert logic)
+  - 4 sample users: Thabo M. (Employee), Naledi K. (Employee), Sipho D. (Employee), Lerato P. (Manager)
+  - At least 6 sample bookings covering every status in the workflow: one Pending Approval, one Approved and awaiting key collection, one with key collected and Checked Out, one fully Closed with a normal return, one Closed with DamageNoted = true (and a matching Incident record auto-created), and one Rejected
+  - Sample ServiceHistory entries for both vehicles
+  - The seed script should be re-runnable (clear existing data and reseed) so I can reset to a clean demo state whenever I want, e.g. `python seed.py --reset`
+- Clear folder structure separating routes, models, schemas, services (so it's obvious later which parts need to change for Azure migration)
+- Basic pytest test stubs for validation logic (mileage check, approval-gating on check-out, key-collected-gating on check-out, required fields)
+
+Please extend the existing project with the following additional requirements:
+
+EMAIL NOTIFICATIONS:
+- Build an email service module, structured so it can later be swapped for a real email provider (Microsoft Graph API or Exchange Online SMTP relay) with minimal change
+- For the prototype, do not send real emails. Instead, log every notification to a new NotificationsLog table (fields: NotificationID PK, BookingID FK, RecipientRole, RecipientName, EmailType, SentAt, Subject, Body, ApprovalToken) and also render them on a simple "Sent Emails" page in the Admin portal, showing the email content as it would have been sent
+- When an Employee submits a booking request, generate a notification to the Manager, including a unique single use approval token and a link (e.g. /approve/{token}) that opens a simple approve/decline page scoped to that booking
+- When a Manager approves or rejects a request, generate a notification to the Employee, stating the outcome and, if approved, that they can collect the keys from the Manager
+- When an Employee completes Check-In (ends a trip), generate a notification to the Manager stating the vehicle is back and the key is expected within the next hour
+
+TIME-BOUND TRIP WINDOWS:
+- Add CheckOutDeadline (datetime) to Bookings, set to KeyCollectedTimestamp plus 1 hour once the key is marked collected
+- Add CheckInDeadline (datetime) to Bookings, set to CheckOutTimestamp plus 1 hour once Check-Out is completed (make this a config value rather than hardcoded, e.g. a settings constant, so the duration can be tuned later)
+- If CheckOutDeadline passes without Check-Out being completed, auto-create an Incident of FlagType "Missed Checkout Window" for Manager review, and generate a notification to both the Employee and Manager. Do not auto-cancel the booking
+- If CheckInDeadline passes without Check-In being completed, auto-create an Incident of FlagType "Overdue Return" for Manager review, and generate a notification to the Manager
+- This deadline check can run as a simple scheduled task, or be checked whenever the landing page loads, either is fine for the prototype
+- Check-Out must require exactly 5 photos: front, back, left, right, and a clear photo of the odometer/mileage reading. Same requirement applies for Check-In
+
+SEPARATE PORTALS:
+- Restructure the frontend into two clearly separate sections: /app (Employee-facing, simple register-style views only) and /admin (Manager-facing, full detail)
+- Employee /app views: landing page (simple vehicle availability only, no analytics), request a car, my trips history, check-out flow, check-in flow
+- Manager /admin views: dashboard summary (open incidents, vehicles nearing service, currently active trips, missed windows), approvals queue, key handover queue, key return queue, full analytics (utilisation, km per driver, incident history), vehicle management (add vehicles, toggle Active/Inactive), sent emails log, full audit log view
+- Role-based access: Employees should not be able to reach any /admin route, even by typing the URL directly, the backend should reject it based on the logged-in user's role, not just hide the link in the UI
+
+VEHICLE MANAGEMENT:
+- Admin can add new vehicles
+- Admin can toggle a vehicle's Active/Inactive status (soft delete). Inactive vehicles should not appear as bookable on the Employee landing page, but their historical bookings, incidents, and service history must remain fully intact and viewable in the Admin portal, do not hard-delete vehicle records
+
+PROJECT STRUCTURE:
+- Keep the project structure clean and minimal, do not generate unnecessary boilerplate files, unused example routes, or placeholder pages beyond what's specified
+- Reuse the existing seed script, extend it to include a couple of sample NotificationsLog entries and at least one booking currently past its CheckOutDeadline or CheckInDeadline, so the Missed Window flagging logic can be demonstrated immediately
+
+In the project file is the standardbank transparent logo to use for UI Design, and overall look and feel of the app.[SBK Transparant Logo.png] 
+
+Please ask me clarifying questions before generating code if anything here is unclear, rather than guessing.

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Incidents - GFS Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="/static/css/theme.css" rel="stylesheet" />
+</head>
+<body>
+  <div id="header"></div>
+  <main class="container pb-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+      <div>
+        <h1 class="h4 mb-1">Incidents</h1>
+        <p class="muted mb-0 small">Damage reports and missed check-out / return windows for manager review.</p>
+      </div>
+      <a class="small" href="/admin/analytics.html">View trends in Analytics</a>
+    </div>
+
+    <div class="row g-3 mb-3" id="summary"></div>
+
+    <div class="gfs-card mb-3">
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span class="small muted me-1">Filter:</span>
+        <button type="button" class="btn btn-sm btn-sb filter-btn active" data-filter="all">All</button>
+        <button type="button" class="btn btn-sm btn-sb-outline filter-btn" data-filter="Open">Open</button>
+        <button type="button" class="btn btn-sm btn-sb-outline filter-btn" data-filter="Under Review">Under Review</button>
+        <button type="button" class="btn btn-sm btn-sb-outline filter-btn" data-filter="Resolved">Resolved</button>
+        <button type="button" class="btn btn-sm btn-sb-outline filter-btn" data-filter="damage">Damage</button>
+        <button type="button" class="btn btn-sm btn-sb-outline filter-btn" data-filter="window">Missed windows</button>
+        <input type="search" id="search" class="form-control form-control-sm ms-auto" style="max-width:220px" placeholder="Search driver / vehicle / type" />
+      </div>
+    </div>
+
+    <div class="gfs-card table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Type</th>
+            <th>Booking</th>
+            <th>Driver</th>
+            <th>Vehicle</th>
+            <th>Raised</th>
+            <th>Status</th>
+            <th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+  <script src="/static/js/api.js?v=2"></script>
+  <script>
+    GFS.ready(function (GFS) {
+    var api = GFS.api, renderHeader = GFS.renderHeader, wireLogout = GFS.wireLogout, formatDt = GFS.formatDt;
+    if (!api.requireAuth({ managerOnly: true })) return;
+    document.getElementById("header").innerHTML = renderHeader("incidents", "admin");
+    wireLogout();
+
+    let allRows = [];
+    let filter = "all";
+    let query = "";
+
+    function statusBadge(s) {
+      const map = { Open: "danger", "Under Review": "warning", Resolved: "success" };
+      return `<span class="badge text-bg-${map[s] || "secondary"}">${s}</span>`;
+    }
+
+    function typeBadge(t) {
+      if (t.indexOf("Damage") >= 0) return `<span class="badge text-bg-dark">${t}</span>`;
+      if (t.indexOf("Overdue") >= 0) return `<span class="badge text-bg-warning text-dark">${t}</span>`;
+      return `<span class="badge text-bg-primary">${t}</span>`;
+    }
+
+    function matches(i) {
+      if (filter === "Open" || filter === "Under Review" || filter === "Resolved") {
+        if (i.ReviewStatus !== filter) return false;
+      } else if (filter === "damage") {
+        if ((i.FlagType || "").indexOf("Damage") < 0) return false;
+      } else if (filter === "window") {
+        if (i.FlagType !== "Missed Checkout Window" && i.FlagType !== "Overdue Return") return false;
+      }
+      if (!query) return true;
+      const hay = [i.FlagType, i.DriverName, i.VehicleReg, i.ResolutionNotes, String(i.BookingID), String(i.IncidentID)]
+        .join(" ").toLowerCase();
+      return hay.indexOf(query) >= 0;
+    }
+
+    function render() {
+      const rows = allRows.filter(matches);
+      document.getElementById("rows").innerHTML = rows.map(i => `
+        <tr>
+          <td>${i.IncidentID}</td>
+          <td>${typeBadge(i.FlagType)}</td>
+          <td>#${i.BookingID}</td>
+          <td>${i.DriverName || ""}</td>
+          <td>${i.VehicleReg || ""}</td>
+          <td class="small">${formatDt(i.RaisedOn)}</td>
+          <td>${statusBadge(i.ReviewStatus)}</td>
+          <td class="small muted" style="max-width:220px">${i.ResolutionNotes || "—"}</td>
+          <td>
+            ${i.ReviewStatus === "Resolved"
+              ? `<button class="btn btn-sm btn-sb-outline" onclick="review(${i.IncidentID})">Re-open / edit</button>`
+              : `<button class="btn btn-sm btn-sb" onclick="review(${i.IncidentID})">Review</button>`}
+          </td>
+        </tr>`).join("") || `<tr><td colspan="9" class="muted">No incidents match this filter</td></tr>`;
+    }
+
+    function renderSummary() {
+      const open = allRows.filter(i => i.ReviewStatus === "Open").length;
+      const review = allRows.filter(i => i.ReviewStatus === "Under Review").length;
+      const resolved = allRows.filter(i => i.ReviewStatus === "Resolved").length;
+      const damage = allRows.filter(i => (i.FlagType || "").indexOf("Damage") >= 0).length;
+      const windows = allRows.filter(i =>
+        i.FlagType === "Missed Checkout Window" || i.FlagType === "Overdue Return"
+      ).length;
+      const cards = [
+        ["Total", allRows.length, "All recorded incidents"],
+        ["Open", open, "Needs attention"],
+        ["Under review", review, "In progress"],
+        ["Resolved", resolved, "Closed with notes"],
+        ["Damage", damage, "Vehicle condition"],
+        ["Missed windows", windows, "Checkout / return"],
+      ];
+      document.getElementById("summary").innerHTML = cards.map(([label, value, hint]) => `
+        <div class="col-6 col-md-4 col-xl-2">
+          <div class="gfs-card h-100">
+            <div class="muted small">${label}</div>
+            <div class="fs-3 fw-semibold">${value}</div>
+            <div class="small muted">${hint}</div>
+          </div>
+        </div>`).join("");
+    }
+
+    async function review(id) {
+      const current = allRows.find(r => r.IncidentID === id);
+      const ReviewStatus = prompt("Status: Open | Under Review | Resolved", (current && current.ReviewStatus) || "Resolved");
+      if (!ReviewStatus) return;
+      const ResolutionNotes = prompt("Resolution notes:", (current && current.ResolutionNotes) || "") || "";
+      try {
+        await api.post(`/api/admin/incidents/${id}/review`, { ReviewStatus, ResolutionNotes });
+        location.reload();
+      } catch (e) { alert(e.message); }
+    }
+    window.review = review;
+
+    document.querySelectorAll(".filter-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".filter-btn").forEach(b => {
+          b.classList.remove("active", "btn-sb");
+          b.classList.add("btn-sb-outline");
+        });
+        btn.classList.add("active", "btn-sb");
+        btn.classList.remove("btn-sb-outline");
+        filter = btn.getAttribute("data-filter");
+        render();
+      });
+    });
+
+    document.getElementById("search").addEventListener("input", (e) => {
+      query = (e.target.value || "").trim().toLowerCase();
+      render();
+    });
+
+    api.get("/api/admin/incidents").then(rows => {
+      allRows = rows || [];
+      renderSummary();
+      render();
+    });
+    });
+  </script>
+</body>
+</html>

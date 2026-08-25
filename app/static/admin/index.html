@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Dashboard - GFS</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="/static/css/theme.css" rel="stylesheet" />
+</head>
+<body>
+  <div id="header"></div>
+  <main class="container pb-5">
+    <h1 class="h4 mb-3">Manager / Admin dashboard</h1>
+    <div class="row g-3" id="cards"></div>
+    <div class="gfs-card mt-4">
+      <h2 class="h6">Active trips</h2>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>ID</th><th>Driver</th><th>Vehicle</th><th>Status</th><th>Purpose</th><th>Deadlines</th></tr></thead>
+          <tbody id="active"></tbody>
+        </table>
+      </div>
+    </div>
+    <p id="err" class="text-danger mt-3"></p>
+  </main>
+  <script src="/static/js/api.js?v=2"></script>
+  <script>
+    GFS.ready(function (GFS) {
+      if (!GFS.api.requireAuth({ managerOnly: true })) return;
+      document.getElementById("header").innerHTML = GFS.renderHeader("dash", "admin");
+      GFS.wireLogout();
+
+      Promise.all([
+        GFS.api.get("/api/admin/dashboard"),
+        GFS.api.get("/api/bookings/active"),
+      ]).then(function (results) {
+        var d = results[0];
+        var trips = results[1];
+        document.getElementById("cards").innerHTML = [
+          ["Open incidents", d.OpenIncidents, "/admin/incidents.html"],
+          ["Nearing service", d.VehiclesNearingService, "/admin/vehicles.html"],
+          ["Active trips", d.ActiveTrips, null],
+          ["Missed windows", d.MissedWindows, "/admin/incidents.html"],
+          ["Pending approvals", d.PendingApprovals, "/admin/approvals.html"],
+          ["Key handover (yours)", d.AwaitingKeyHandover, "/admin/keys.html"],
+          ["Key return (yours)", d.AwaitingKeyReturn, "/admin/keys.html"],
+        ].map(function (row) {
+          return (
+            '<div class="col-6 col-md-3"><div class="gfs-card">' +
+            '<div class="muted small">' + row[0] + "</div>" +
+            '<div class="fs-3 fw-semibold">' + row[1] + "</div>" +
+            (row[2] ? '<a class="small" href="' + row[2] + '">Open</a>' : "") +
+            "</div></div>"
+          );
+        }).join("");
+
+        document.getElementById("active").innerHTML = trips.map(function (b) {
+          return (
+            "<tr><td>" + b.BookingID + "</td><td>" + (b.DriverName || "") + "</td><td>" +
+            (b.VehicleReg || "") + "</td><td>" + GFS.statusPill(b.BookingStatus) + "</td><td>" +
+            b.PurposeReason + '</td><td class="small">Out: ' + GFS.formatDt(b.CheckOutDeadline) +
+            "<br/>In: " + GFS.formatDt(b.CheckInDeadline) + "</td></tr>"
+          );
+        }).join("") || '<tr><td colspan="6" class="muted">None</td></tr>';
+      }).catch(function (e) {
+        document.getElementById("err").textContent = e.message;
+        if (e.status === 401) window.location.href = "/login.html";
+        if (e.status === 403) window.location.href = "/app/index.html";
+      });
+    });
+  </script>
+</body>
+</html>

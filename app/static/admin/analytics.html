@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Analytics - GFS Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="/static/css/theme.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div id="header"></div>
+  <main class="container pb-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+      <div>
+        <h1 class="h4 mb-1">Fleet analytics</h1>
+        <p class="muted mb-0 small">Closed trips, utilisation, destinations, and incident patterns across the pool.</p>
+      </div>
+      <span class="badge text-bg-light border" id="dataNote">Loading…</span>
+    </div>
+
+    <div class="row g-3 mb-3" id="kpiRow"></div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-lg-8">
+        <div class="gfs-card h-100">
+          <h2 class="h6 mb-3">Trips, kilometres &amp; incidents by month</h2>
+          <canvas id="chartTrend" height="120"></canvas>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="gfs-card h-100">
+          <h2 class="h6 mb-3">Incidents by type</h2>
+          <canvas id="chartIncType" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <div class="gfs-card h-100">
+          <h2 class="h6 mb-3">Km per driver</h2>
+          <canvas id="chartKmDriver" height="220"></canvas>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="gfs-card h-100">
+          <h2 class="h6 mb-3">Trips per vehicle</h2>
+          <canvas id="chartTripsVehicle" height="220"></canvas>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="gfs-card h-100">
+          <h2 class="h6 mb-3">Booking status mix</h2>
+          <canvas id="chartStatus" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-lg-5">
+        <div class="gfs-card h-100">
+          <h2 class="h6 mb-3">Top destinations</h2>
+          <canvas id="chartDest" height="220"></canvas>
+        </div>
+      </div>
+      <div class="col-lg-7">
+        <div class="gfs-card h-100">
+          <h2 class="h6 mb-3">Driver risk profile</h2>
+          <p class="small muted mb-2">Incidents relative to closed trips - useful for coaching and process review.</p>
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th>Driver</th>
+                  <th class="text-end">Trips</th>
+                  <th class="text-end">Km</th>
+                  <th class="text-end">Incidents</th>
+                  <th class="text-end">Inc / trip</th>
+                </tr>
+              </thead>
+              <tbody id="driverRisk"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-lg-5">
+        <div class="gfs-card h-100">
+          <h2 class="h6 mb-3">Vehicle utilisation</h2>
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th>Vehicle</th>
+                  <th class="text-end">Trips</th>
+                  <th class="text-end">Km</th>
+                  <th class="text-end">Incidents</th>
+                </tr>
+              </thead>
+              <tbody id="vehUtil"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-7">
+        <div class="gfs-card h-100">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h6 mb-0">Incident history</h2>
+            <a class="small" href="/admin/incidents.html">Open Incidents tab</a>
+          </div>
+          <div class="table-responsive" style="max-height: 320px; overflow: auto;">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Driver</th>
+                  <th>Vehicle</th>
+                  <th>Raised</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="inc"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="/static/js/api.js?v=2"></script>
+  <script>
+    GFS.ready(function (GFS) {
+    var api = GFS.api, renderHeader = GFS.renderHeader, wireLogout = GFS.wireLogout, formatDt = GFS.formatDt;
+    if (!api.requireAuth({ managerOnly: true })) return;
+    document.getElementById("header").innerHTML = renderHeader("analytics", "admin");
+    wireLogout();
+
+    const SB = {
+      navy: "#001F5B",
+      primary: "#0033A0",
+      accent: "#0072CE",
+      success: "#0B7A3B",
+      danger: "#B00020",
+      warning: "#9A6B00",
+      muted: "#5C6B7A",
+      border: "#D6DEEB",
+      palette: ["#0033A0", "#0072CE", "#0B7A3B", "#9A6B00", "#B00020", "#5C6B7A", "#4A6FA5", "#2A9D8F"],
+    };
+
+    Chart.defaults.font.family = '"Segoe UI", "Helvetica Neue", Arial, sans-serif';
+    Chart.defaults.color = SB.muted;
+    Chart.defaults.plugins.legend.labels.boxWidth = 12;
+
+    function kpi(label, value, hint) {
+      return `<div class="col-6 col-md-4 col-xl-3">
+        <div class="gfs-card h-100">
+          <div class="muted small">${label}</div>
+          <div class="fs-3 fw-semibold">${value}</div>
+          ${hint ? `<div class="small muted">${hint}</div>` : ""}
+        </div>
+      </div>`;
+    }
+
+    function statusBadge(s) {
+      const map = { Open: "danger", "Under Review": "warning", Resolved: "success" };
+      const cls = map[s] || "secondary";
+      return `<span class="badge text-bg-${cls}">${s}</span>`;
+    }
+
+    function barOpts(stacked) {
+      return {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: { legend: { display: !!stacked } },
+        scales: {
+          x: { grid: { display: false }, stacked: !!stacked },
+          y: { beginAtZero: true, stacked: !!stacked, ticks: { precision: 0 } },
+        },
+      };
+    }
+
+    api.get("/api/admin/analytics").then(a => {
+      const s = a.Summary || {};
+      document.getElementById("dataNote").textContent =
+        `${s.ClosedTripCount || 0} closed trips · ${a.IncidentHistory ? a.IncidentHistory.length : 0} incidents`;
+
+      document.getElementById("kpiRow").innerHTML = [
+        kpi("Closed trips", s.ClosedTripCount ?? 0, "Completed & keys returned"),
+        kpi("Total km driven", (s.TotalKmDriven ?? 0).toLocaleString(), `Avg ${s.AvgKmPerTrip ?? 0} km / trip`),
+        kpi("Avg trip duration", `${s.AvgTripDurationHours ?? 0} h`, "Check-out to check-in"),
+        kpi("Open incidents", s.OpenIncidents ?? 0, `${s.ResolvedIncidents ?? 0} resolved`),
+        kpi("Damage reports", s.DamageIncidents ?? 0, "Check-in / check-out damage"),
+        kpi("Missed windows", s.MissedWindowIncidents ?? 0, "Checkout & overdue return"),
+        kpi("Incident rate", `${s.IncidentRatePct ?? 0}%`, "Incidents / closed trips"),
+        kpi("Rejection rate", `${s.RejectionRatePct ?? 0}%`, `${s.ImmediatePct ?? 0}% immediate requests`),
+      ].join("");
+
+      const trend = a.TripsTrend || [];
+      new Chart(document.getElementById("chartTrend"), {
+        type: "bar",
+        data: {
+          labels: trend.map(t => t.Month),
+          datasets: [
+            {
+              type: "bar",
+              label: "Trips",
+              data: trend.map(t => t.Trips),
+              backgroundColor: SB.primary,
+              borderRadius: 4,
+              yAxisID: "y",
+            },
+            {
+              type: "bar",
+              label: "Km (÷10)",
+              data: trend.map(t => Math.round(t.Km / 10)),
+              backgroundColor: SB.accent + "99",
+              borderRadius: 4,
+              yAxisID: "y",
+            },
+            {
+              type: "line",
+              label: "Incidents",
+              data: trend.map(t => t.Incidents),
+              borderColor: SB.danger,
+              backgroundColor: SB.danger,
+              tension: 0.3,
+              yAxisID: "y1",
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: "index", intersect: false },
+          scales: {
+            x: { grid: { display: false } },
+            y: { beginAtZero: true, title: { display: true, text: "Trips / Km÷10" }, ticks: { precision: 0 } },
+            y1: {
+              beginAtZero: true,
+              position: "right",
+              grid: { drawOnChartArea: false },
+              title: { display: true, text: "Incidents" },
+              ticks: { precision: 0 },
+            },
+          },
+        },
+      });
+
+      const incTypes = Object.entries(a.IncidentsByType || {});
+      new Chart(document.getElementById("chartIncType"), {
+        type: "doughnut",
+        data: {
+          labels: incTypes.map(([k]) => k),
+          datasets: [{
+            data: incTypes.map(([, v]) => v),
+            backgroundColor: SB.palette,
+            borderWidth: 1,
+            borderColor: "#fff",
+          }],
+        },
+        options: {
+          plugins: { legend: { position: "bottom", labels: { font: { size: 11 } } } },
+        },
+      });
+
+      const kmDriver = Object.entries(a.KmPerDriver || {});
+      new Chart(document.getElementById("chartKmDriver"), {
+        type: "bar",
+        data: {
+          labels: kmDriver.map(([k]) => k.split(" ")[0]),
+          datasets: [{
+            label: "Km",
+            data: kmDriver.map(([, v]) => v),
+            backgroundColor: SB.navy,
+            borderRadius: 4,
+          }],
+        },
+        options: barOpts(false),
+      });
+
+      const tripsVeh = Object.entries(a.TripsPerVehicle || {});
+      new Chart(document.getElementById("chartTripsVehicle"), {
+        type: "bar",
+        data: {
+          labels: tripsVeh.map(([k]) => k),
+          datasets: [{
+            label: "Trips",
+            data: tripsVeh.map(([, v]) => v),
+            backgroundColor: SB.accent,
+            borderRadius: 4,
+          }],
+        },
+        options: barOpts(false),
+      });
+
+      const statuses = Object.entries(a.BookingStatusBreakdown || {});
+      new Chart(document.getElementById("chartStatus"), {
+        type: "doughnut",
+        data: {
+          labels: statuses.map(([k]) => k),
+          datasets: [{
+            data: statuses.map(([, v]) => v),
+            backgroundColor: SB.palette,
+            borderWidth: 1,
+            borderColor: "#fff",
+          }],
+        },
+        options: {
+          plugins: { legend: { position: "bottom", labels: { font: { size: 10 } } } },
+        },
+      });
+
+      const dests = a.TopDestinations || [];
+      new Chart(document.getElementById("chartDest"), {
+        type: "bar",
+        data: {
+          labels: dests.map(d => d.Destination.length > 18 ? d.Destination.slice(0, 16) + "…" : d.Destination),
+          datasets: [{
+            label: "Trips",
+            data: dests.map(d => d.Trips),
+            backgroundColor: SB.success,
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { beginAtZero: true, ticks: { precision: 0 } },
+            y: { grid: { display: false } },
+          },
+        },
+      });
+
+      document.getElementById("driverRisk").innerHTML = (a.DriverRisk || []).map(r => `
+        <tr>
+          <td>${r.Driver}</td>
+          <td class="text-end">${r.Trips}</td>
+          <td class="text-end">${r.Km}</td>
+          <td class="text-end">${r.Incidents}</td>
+          <td class="text-end">${r.IncidentsPerTrip == null ? "-" : r.IncidentsPerTrip}</td>
+        </tr>`).join("") || `<tr><td colspan="5" class="muted">No closed-trip data</td></tr>`;
+
+      document.getElementById("vehUtil").innerHTML = (a.VehicleUtilization || []).map(v => `
+        <tr>
+          <td>${v.Registration}</td>
+          <td class="text-end">${v.Trips}</td>
+          <td class="text-end">${v.Km}</td>
+          <td class="text-end">${v.Incidents}</td>
+        </tr>`).join("") || `<tr><td colspan="4" class="muted">None</td></tr>`;
+
+      document.getElementById("inc").innerHTML = (a.IncidentHistory || []).map(i => `
+        <tr>
+          <td class="small">${i.FlagType}</td>
+          <td class="small">${i.DriverName || "-"}</td>
+          <td class="small">${i.VehicleReg || "-"}</td>
+          <td class="small">${formatDt(i.RaisedOn)}</td>
+          <td>${statusBadge(i.ReviewStatus)}</td>
+        </tr>`).join("") || `<tr><td colspan="5" class="muted">None</td></tr>`;
+    }).catch(err => {
+      document.getElementById("dataNote").textContent = "Failed to load";
+      alert(err.message || String(err));
+    });
+    });
+  </script>
+</body>
+</html>

@@ -83,3 +83,6 @@ Missed check-out / overdue return windows (`TRIP_WINDOW_HOURS` in `app/config.py
 - Vehicles are soft-deactivated (`IsActive`); no hard deletes of vehicles or bookings.
 - Employees cannot call `/api/admin/*` (403). UI also keeps them on `/app`.
 - Camera capture uses `getUserMedia` (HTTPS or localhost).
+
+
+-- Testing neo was here 

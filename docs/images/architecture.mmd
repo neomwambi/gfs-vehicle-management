@@ -1,0 +1,49 @@
+flowchart TB
+  subgraph ui ["Browser"]
+    Emp["Employee portal /app"]
+    Adm["Admin portal /admin"]
+    Login["login.html"]
+  end
+
+  subgraph api ["FastAPI — app/main.py"]
+    AuthR["routes/auth.py"]
+    BookR["routes/bookings.py"]
+    VehR["routes/vehicles.py"]
+    AdmR["routes/admin.py"]
+    Loop["deadline_loop"]
+  end
+
+  subgraph domain ["Services"]
+    BookS["booking.py"]
+    AuthS["auth.py"]
+    VehS["vehicles.py"]
+    DeadS["deadlines.py"]
+    Mail["email.py"]
+    Store["storage.py"]
+    Audit["audit.py"]
+  end
+
+  subgraph data ["Persistence"]
+    SQLite[("SQLite data/gfs_vehicles.db")]
+    Files["uploads/"]
+  end
+
+  Login --> AuthR
+  Emp --> BookR
+  Emp --> VehR
+  Adm --> BookR
+  Adm --> AdmR
+  AuthR --> AuthS
+  BookR --> BookS
+  VehR --> VehS
+  AdmR --> SQLite
+  BookS --> Mail
+  BookS --> Store
+  BookS --> Audit
+  BookS --> SQLite
+  AuthS --> SQLite
+  VehS --> SQLite
+  Loop --> DeadS
+  DeadS --> Mail
+  DeadS --> SQLite
+  Store --> Files

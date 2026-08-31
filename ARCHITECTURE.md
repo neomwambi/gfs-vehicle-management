@@ -71,7 +71,7 @@ Auth is a process-memory token map (`token → UserID`) in `app/services/auth.py
 
 ## Booking flow
 
-Happy path is a six-step handshake between employee and the approving manager. Missed windows do not cancel the trip — they Flag it and raise an Incident. The same approver must confirm both key handover and key return.
+Happy path is a six-step handshake between employee and the approving manager. Missed windows do not cancel the trip they Flag it and raise an Incident. The same approver must confirm both key handover and key return.
 
 ![Booking lifecycle from request through Closed, with Flagged missed-window branches](docs/images/booking-flow.png)
 

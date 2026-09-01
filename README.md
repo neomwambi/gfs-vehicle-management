@@ -91,5 +91,10 @@ Missed check-out / overdue return windows (`TRIP_WINDOW_HOURS` in `app/config.py
 -- Testing neo was here 
 -- Testing on the v2 branch
 
-
+-- Common what doing going on
 -- More testing  -- Pro level 
+
+-- getting too good at this
+
+-- this app will be the best thing ever they will see
+

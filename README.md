@@ -98,3 +98,4 @@ Missed check-out / overdue return windows (`TRIP_WINDOW_HOURS` in `app/config.py
 
 -- this app will be the best thing ever they will see
 
+-- lets make this money

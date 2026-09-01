@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="860" viewBox="0 0 1280 860" role="img" aria-labelledby="title desc">
+  <title id="title">GFS Vehicle Management system architecture</title>
+  <desc id="desc">Layered architecture: browser portals, FastAPI routes, domain services, and persistence.</desc>
+  <rect width="1280" height="860" fill="#F7F9FC"/>
+  <text x="40" y="42" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#001F5B">GFS Vehicle Management  system architecture</text>
+  <text x="40" y="66" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#4A5A73">FastAPI serves HTML portals and /api/* from one process. Highlighted core: main.py and booking.py.</text>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0033A0"/>
+    </marker>
+  </defs>
+
+  <!-- Layer bands -->
+  <rect x="24" y="88" width="1232" height="130" rx="10" fill="#FFFFFF" stroke="#D5DEEA"/>
+  <text x="40" y="112" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#0072CE">BROWSER</text>
+
+  <rect x="24" y="238" width="1232" height="150" rx="10" fill="#FFFFFF" stroke="#D5DEEA"/>
+  <text x="40" y="262" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#0072CE">FASTAPI  app/main.py</text>
+
+  <rect x="24" y="408" width="1232" height="230" rx="10" fill="#FFFFFF" stroke="#D5DEEA"/>
+  <text x="40" y="432" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#0072CE">SERVICES</text>
+
+  <rect x="24" y="658" width="1232" height="170" rx="10" fill="#FFFFFF" stroke="#D5DEEA"/>
+  <text x="40" y="682" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#0072CE">PERSISTENCE</text>
+
+  <!-- Browser boxes -->
+  <g font-family="Segoe UI, Arial, sans-serif" font-size="14" text-anchor="middle">
+    <rect x="80" y="128" width="320" height="64" rx="8" fill="#E8F1FB" stroke="#0033A0"/>
+    <text x="240" y="156" fill="#001F5B" font-weight="600">Employee portal /app</text>
+    <text x="240" y="176" fill="#4A5A73" font-size="12">vehicles · request · trips · check-out/in</text>
+
+    <rect x="480" y="128" width="320" height="64" rx="8" fill="#E8F1FB" stroke="#0033A0"/>
+    <text x="640" y="156" fill="#001F5B" font-weight="600">Admin portal /admin</text>
+    <text x="640" y="176" fill="#4A5A73" font-size="12">approvals · keys · incidents · analytics</text>
+
+    <rect x="880" y="128" width="320" height="64" rx="8" fill="#E8F1FB" stroke="#0033A0"/>
+    <text x="1040" y="165" fill="#001F5B" font-weight="600">login.html</text>
+  </g>
+
+  <!-- FastAPI boxes -->
+  <g font-family="Segoe UI, Arial, sans-serif" font-size="13" text-anchor="middle">
+    <rect x="56" y="280" width="210" height="80" rx="8" fill="#F4F7FB" stroke="#8AA0C0"/>
+    <text x="161" y="314" fill="#001F5B">routes/auth.py</text>
+    <text x="161" y="334" fill="#4A5A73" font-size="11">login · session · /me</text>
+
+    <rect x="286" y="280" width="230" height="80" rx="8" fill="#0033A0" stroke="#001F5B"/>
+    <text x="401" y="314" fill="#FFFFFF" font-weight="600">routes/bookings.py</text>
+    <text x="401" y="334" fill="#D6E4F7" font-size="11">request · decide · keys · photos</text>
+
+    <rect x="536" y="280" width="210" height="80" rx="8" fill="#F4F7FB" stroke="#8AA0C0"/>
+    <text x="641" y="314" fill="#001F5B">routes/vehicles.py</text>
+    <text x="641" y="334" fill="#4A5A73" font-size="11">list · add · service-due</text>
+
+    <rect x="766" y="280" width="210" height="80" rx="8" fill="#F4F7FB" stroke="#8AA0C0"/>
+    <text x="871" y="314" fill="#001F5B">routes/admin.py</text>
+    <text x="871" y="334" fill="#4A5A73" font-size="11">dashboard · audit · analytics</text>
+
+    <rect x="996" y="280" width="210" height="80" rx="8" fill="#F4F7FB" stroke="#8AA0C0"/>
+    <text x="1101" y="314" fill="#001F5B">deadline_loop</text>
+    <text x="1101" y="334" fill="#4A5A73" font-size="11">every 60s in lifespan</text>
+  </g>
+
+  <!-- Services -->
+  <g font-family="Segoe UI, Arial, sans-serif" font-size="13" text-anchor="middle">
+    <rect x="56" y="456" width="230" height="72" rx="8" fill="#0033A0" stroke="#001F5B"/>
+    <text x="171" y="487" fill="#FFFFFF" font-weight="600">booking.py</text>
+    <text x="171" y="507" fill="#D6E4F7" font-size="11">state machine · conflicts</text>
+
+    <rect x="306" y="456" width="170" height="72" rx="8" fill="#E8F1FB" stroke="#0033A0"/>
+    <text x="391" y="487" fill="#001F5B">auth.py</text>
+    <text x="391" y="507" fill="#4A5A73" font-size="11">in-memory sessions</text>
+
+    <rect x="496" y="456" width="170" height="72" rx="8" fill="#E8F1FB" stroke="#0033A0"/>
+    <text x="581" y="487" fill="#001F5B">vehicles.py</text>
+    <text x="581" y="507" fill="#4A5A73" font-size="11">status sync · service due</text>
+
+    <rect x="686" y="456" width="170" height="72" rx="8" fill="#E8F1FB" stroke="#0033A0"/>
+    <text x="771" y="487" fill="#001F5B">deadlines.py</text>
+    <text x="771" y="507" fill="#4A5A73" font-size="11">missed windows ’ Flagged</text>
+
+    <rect x="876" y="456" width="154" height="72" rx="8" fill="#F4F7FB" stroke="#8AA0C0"/>
+    <text x="953" y="487" fill="#001F5B">email.py</text>
+    <text x="953" y="507" fill="#4A5A73" font-size="11">NotificationsLog</text>
+
+    <rect x="1050" y="456" width="156" height="72" rx="8" fill="#F4F7FB" stroke="#8AA0C0"/>
+    <text x="1128" y="487" fill="#001F5B">storage.py</text>
+    <text x="1128" y="507" fill="#4A5A73" font-size="11">local photo files</text>
+
+    <rect x="56" y="548" width="170" height="60" rx="8" fill="#F4F7FB" stroke="#8AA0C0"/>
+    <text x="141" y="583" fill="#001F5B">audit.py</text>
+  </g>
+
+  <!-- Persistence -->
+  <g font-family="Segoe UI, Arial, sans-serif" font-size="14" text-anchor="middle">
+    <rect x="160" y="710" width="420" height="80" rx="8" fill="#001F5B"/>
+    <text x="370" y="744" fill="#FFFFFF" font-weight="600">SQLite  data/gfs_vehicles.db</text>
+    <text x="370" y="766" fill="#B8C7E0" font-size="12">Users · Vehicles · Bookings · Incidents · AuditLog</text>
+
+    <rect x="700" y="710" width="420" height="80" rx="8" fill="#001F5B"/>
+    <text x="910" y="744" fill="#FFFFFF" font-weight="600">uploads/</text>
+    <text x="910" y="766" fill="#B8C7E0" font-size="12">check-out / check-in photos per booking</text>
+  </g>
+
+  <!-- Arrows: browser to API -->
+  <g stroke="#0033A0" stroke-width="1.5" fill="none" marker-end="url(#arrow)">
+    <line x1="240" y1="192" x2="401" y2="280"/>
+    <line x1="640" y1="192" x2="401" y2="280"/>
+    <line x1="640" y1="192" x2="871" y2="280"/>
+    <line x1="1040" y1="192" x2="161" y2="280"/>
+    <!-- API to services -->
+    <line x1="161" y1="360" x2="391" y2="456"/>
+    <line x1="401" y1="360" x2="171" y2="456"/>
+    <line x1="641" y1="360" x2="581" y2="456"/>
+    <line x1="1101" y1="360" x2="771" y2="456"/>
+    <!-- services to persistence / adapters -->
+    <line x1="171" y1="528" x2="141" y2="548"/>
+    <line x1="171" y1="528" x2="370" y2="710"/>
+    <line x1="391" y1="528" x2="370" y2="710"/>
+    <line x1="581" y1="528" x2="370" y2="710"/>
+    <line x1="771" y1="528" x2="370" y2="710"/>
+    <line x1="953" y1="528" x2="370" y2="710"/>
+    <line x1="1128" y1="528" x2="910" y2="710"/>
+    <line x1="171" y1="528" x2="953" y2="528" stroke-dasharray="4 3" marker-end="none"/>
+  </g>
+</svg>

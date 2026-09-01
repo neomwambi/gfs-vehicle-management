@@ -2,6 +2,9 @@
 
 Local prototype for Group Forensic Services pool-vehicle booking, approval, key handover, photo check-out/check-in, and audit trail.
 
+- Presenting to management or operations? Use the [stakeholder briefing](docs/GFS-Vehicle-Management-Presentation.md).
+- New to the codebase? Read the [architecture tour](ARCHITECTURE.md) for layers, the booking state machine, key files, and suggested first changes.
+
 ## Stack
 
 - **Backend:** FastAPI + SQLAlchemy + SQLite

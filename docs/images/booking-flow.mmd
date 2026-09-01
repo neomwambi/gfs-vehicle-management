@@ -1,0 +1,13 @@
+stateDiagram-v2
+  [*] --> Pending: Employee request
+  Pending --> Cancelled: Driver or manager cancel
+  Pending --> Rejected: Manager reject
+  Pending --> Approved: Manager approve
+  Approved --> Approved: Key collected
+  Approved --> Flagged: Missed check-out window
+  Approved --> CheckedOut: 5 photos + mileage
+  Flagged --> CheckedOut: Late check-out still allowed
+  CheckedOut --> Flagged: Overdue return
+  CheckedOut --> CheckedIn: 5 photos + mileage
+  Flagged --> CheckedIn: Late check-in still allowed
+  CheckedIn --> Closed: Approver confirms key return

@@ -42,6 +42,18 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
+    from sqlalchemy import inspect, text
+
     from app.models import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+
+    # Lightweight SQLite column add for local prototype upgrades
+    inspector = inspect(engine)
+    if "Bookings" in inspector.get_table_names():
+        cols = {c["name"] for c in inspector.get_columns("Bookings")}
+        if "CaseNumber" not in cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE Bookings ADD COLUMN CaseNumber VARCHAR(64) NOT NULL DEFAULT ''")
+                )

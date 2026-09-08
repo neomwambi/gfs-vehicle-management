@@ -55,6 +55,10 @@ class VehicleOut(BaseModel):
     KmUntilService: int | None = None
     CurrentDriverName: str | None = None
     CurrentBookingID: int | None = None
+    NextAvailableFrom: datetime | None = None
+    # Calendar helpers (no booking/driver details)
+    UnavailableDates: list[str] = []  # YYYY-MM-DD fully blocked
+    AfternoonOnlyDates: list[str] = []  # YYYY-MM-DD bookable from 12:00 only
 
     model_config = {"from_attributes": True}
 
@@ -66,6 +70,7 @@ class BookingRequestCreate(BaseModel):
     ReservationEnd: datetime | None = None
     PurposeReason: str = Field(min_length=1)
     Destination: str = Field(min_length=1)
+    CaseNumber: str = Field(min_length=1)
 
     @model_validator(mode="after")
     def validate_reservation(self):
@@ -73,11 +78,12 @@ class BookingRequestCreate(BaseModel):
             raise ValueError("PurposeReason is required")
         if not self.Destination.strip():
             raise ValueError("Destination is required")
-        if self.BookingType == "Advance Reservation":
-            if self.ReservationStart is None or self.ReservationEnd is None:
-                raise ValueError("Advance Reservation requires ReservationStart and ReservationEnd")
-            if self.ReservationEnd <= self.ReservationStart:
-                raise ValueError("ReservationEnd must be after ReservationStart")
+        if not self.CaseNumber.strip():
+            raise ValueError("CaseNumber is required")
+        if self.ReservationStart is None or self.ReservationEnd is None:
+            raise ValueError("ReservationStart and ReservationEnd are required")
+        if self.ReservationEnd <= self.ReservationStart:
+            raise ValueError("ReservationEnd must be after ReservationStart")
         return self
 
 
@@ -164,6 +170,7 @@ class BookingOut(BaseModel):
     ReservationEnd: datetime | None
     PurposeReason: str
     Destination: str
+    CaseNumber: str | None = None
     BookingStatus: str
     RequestedAt: datetime
     ApprovedBy: int | None

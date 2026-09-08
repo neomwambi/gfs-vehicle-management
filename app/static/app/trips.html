@@ -48,7 +48,7 @@
           <td>${b.BookingID}</td>
           <td>${b.VehicleMakeModel || ""}<div class="small muted">${b.VehicleReg || ""}</div></td>
           <td>${statusPill(b.BookingStatus)}</td>
-          <td>${b.PurposeReason}<div class="small muted">${b.Destination}</div></td>
+          <td>${b.PurposeReason}<div class="small muted">${b.CaseNumber || ""} · ${b.Destination}</div></td>
           <td class="small">${formatDt(b.RequestedAt)}</td>
           <td class="text-nowrap">
             ${b.BookingStatus === "Pending Approval"

@@ -159,6 +159,62 @@ body {
   white-space: nowrap;
 }
 
+/* Flatpickr: make unavailable days clearly unselectable */
+.flatpickr-day.flatpickr-disabled,
+.flatpickr-day.flatpickr-disabled:hover {
+  color: #b0b8c4 !important;
+  background: #eef1f6 !important;
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+.destination-field {
+  position: relative;
+}
+
+.destination-suggestions {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1100;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--sb-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0, 31, 91, 0.12);
+}
+
+.destination-suggestions li {
+  padding: 0.55rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #eef1f6;
+}
+
+.destination-suggestions li:last-child {
+  border-bottom: none;
+}
+
+.destination-suggestions li:hover,
+.destination-suggestions li:focus {
+  background: #e8eef8;
+  outline: none;
+}
+
+.destination-map {
+  width: 100%;
+  height: 200px;
+  border: 1px solid var(--sb-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #e8eef8;
+  z-index: 1;
+}
+
 .muted { color: var(--sb-muted); }
 .table td, .table th { vertical-align: middle; }
 

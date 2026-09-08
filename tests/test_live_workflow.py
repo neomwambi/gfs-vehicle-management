@@ -34,6 +34,15 @@ def client_for(username: str) -> tuple[httpx.Client, dict]:
     return c, data["user"]
 
 
+def trip_window(*, hours: float = 3.0, start_offset_minutes: int = 0) -> dict:
+    start = datetime.utcnow() + timedelta(minutes=start_offset_minutes)
+    end = start + timedelta(hours=hours)
+    return {
+        "ReservationStart": start.isoformat() + "Z",
+        "ReservationEnd": end.isoformat() + "Z",
+    }
+
+
 def tiny_jpeg_data_url() -> str:
     # Minimal valid JPEG (1x1 pixel)
     jpeg = base64.b64decode(
@@ -151,6 +160,8 @@ def main() -> int:
                 "BookingType": "Immediate",
                 "PurposeReason": "Should fail",
                 "Destination": "Nowhere",
+                "CaseNumber": "GFS-9000",
+                **trip_window(),
             },
         )
         if r.status_code == 400:
@@ -175,6 +186,8 @@ def main() -> int:
             "BookingType": "Immediate",
             "PurposeReason": "Demo site visit",
             "Destination": "Cape Town CBD",
+            "CaseNumber": "GFS-9001",
+            **trip_window(),
         },
     )
     if r.status_code != 200:
@@ -298,6 +311,8 @@ def main() -> int:
                 "BookingType": "Immediate",
                 "PurposeReason": "Will cancel",
                 "Destination": "Test",
+                "CaseNumber": "GFS-9002",
+                **trip_window(),
             },
         )
         cancel_id = r.json()["BookingID"]
@@ -334,6 +349,8 @@ def main() -> int:
                 "BookingType": "Immediate",
                 "PurposeReason": " ",
                 "Destination": "X",
+                "CaseNumber": "GFS-9003",
+                **trip_window(),
             },
         )
         if r.status_code == 422:

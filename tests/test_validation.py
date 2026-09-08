@@ -16,12 +16,19 @@ def _all_photos():
 
 
 def test_purpose_and_destination_required():
+    from datetime import datetime, timedelta
+
+    start = datetime.utcnow()
+    end = start + timedelta(hours=2)
     with pytest.raises(ValidationError):
         BookingRequestCreate(
             VehicleID=1,
             BookingType="Immediate",
             PurposeReason="   ",
             Destination="Somewhere",
+            CaseNumber="GFS-1",
+            ReservationStart=start,
+            ReservationEnd=end,
         )
     with pytest.raises(ValidationError):
         BookingRequestCreate(
@@ -29,7 +36,44 @@ def test_purpose_and_destination_required():
             BookingType="Immediate",
             PurposeReason="Work",
             Destination="",
+            CaseNumber="GFS-1",
+            ReservationStart=start,
+            ReservationEnd=end,
         )
+    with pytest.raises(ValidationError):
+        BookingRequestCreate(
+            VehicleID=1,
+            BookingType="Immediate",
+            PurposeReason="Work",
+            Destination="Somewhere",
+            CaseNumber="  ",
+            ReservationStart=start,
+            ReservationEnd=end,
+        )
+
+
+def test_immediate_requires_start_and_end():
+    from datetime import datetime, timedelta
+
+    start = datetime.utcnow()
+    end = start + timedelta(hours=2)
+    with pytest.raises(ValidationError):
+        BookingRequestCreate(
+            VehicleID=1,
+            BookingType="Immediate",
+            PurposeReason="Work",
+            Destination="Office",
+        )
+    ok = BookingRequestCreate(
+        VehicleID=1,
+        BookingType="Immediate",
+        PurposeReason="Work",
+        Destination="Office",
+        CaseNumber="GFS-100",
+        ReservationStart=start,
+        ReservationEnd=end,
+    )
+    assert ok.ReservationEnd == end
 
 
 def test_advance_requires_window():

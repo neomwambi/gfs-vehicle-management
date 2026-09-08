@@ -12,6 +12,7 @@ from app.services.vehicles import (
     is_service_due_soon,
     km_until_service,
     sync_vehicle_status,
+    vehicle_availability,
 )
 
 router = APIRouter(prefix="/api/vehicles", tags=["vehicles"])
@@ -25,6 +26,7 @@ def _to_out(db: Session, v: Vehicle) -> VehicleOut:
         booking_id = holder.BookingID
         if holder.driver:
             driver_name = holder.driver.DisplayName
+    avail = vehicle_availability(db, v)
     return VehicleOut(
         VehicleID=v.VehicleID,
         RegistrationNumber=v.RegistrationNumber,
@@ -42,6 +44,9 @@ def _to_out(db: Session, v: Vehicle) -> VehicleOut:
         KmUntilService=km_until_service(v),
         CurrentDriverName=driver_name,
         CurrentBookingID=booking_id,
+        NextAvailableFrom=avail["NextAvailableFrom"],
+        UnavailableDates=avail["UnavailableDates"],
+        AfternoonOnlyDates=avail["AfternoonOnlyDates"],
     )
 
 

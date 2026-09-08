@@ -39,6 +39,14 @@ NOTE: Port 8000 may be blocked on some Windows machines. Use 8001.
 If you prefer another port, change 8001 in the command and the URL.
 
 
+DESTINATION MAP (Request page)
+------------------------------
+Uses free Photon (OpenStreetMap) search + Leaflet map tiles.
+No API key or .env entry required. Type 3+ characters in Destination,
+pick a suggestion, and a map pin appears. Results are limited to
+South Africa (bbox + country filter).
+
+
 WHY NOT "activate"?
 -------------------
 PowerShell may block:

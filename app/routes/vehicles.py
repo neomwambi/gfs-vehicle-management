@@ -1,3 +1,9 @@
+"""Vehicle list / create / deactivate APIs.
+
+Employees see active fleet with availability calendar fields; managers can list all
+and manage inventory. Status is re-synced from bookings on each list call.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -19,6 +25,7 @@ router = APIRouter(prefix="/api/vehicles", tags=["vehicles"])
 
 
 def _to_out(db: Session, v: Vehicle) -> VehicleOut:
+    """Enrich ORM row with service-due hints, current holder, and midday calendar fields."""
     holder = current_holder(db, v.VehicleID)
     driver_name = None
     booking_id = None
@@ -56,6 +63,7 @@ def list_vehicles(
     user: AuthUser = Depends(get_current_user),
     all: bool = False,
 ):
+    """Default: active vehicles for booking UI. ?all=1: full fleet (Manager/Admin)."""
     if all:
         if not user.is_manager_portal:
             raise HTTPException(status_code=403, detail="Manager or Admin role required")
@@ -128,6 +136,7 @@ def toggle_active(
     db: Session = Depends(get_db),
     user: AuthUser = Depends(require_manager),
 ):
+    """Soft-retire or restore a vehicle. Block deactivation while Reserved/In Use."""
     vehicle = db.get(Vehicle, vehicle_id)
     if not vehicle:
         raise HTTPException(status_code=404, detail="Vehicle not found")

@@ -31,6 +31,7 @@ def log_notification(
     approval_token: str | None = None,
     changed_by: int | None = None,
 ) -> NotificationsLog:
+    """Persist a simulated email row (and audit). Does not send SMTP."""
     row = NotificationsLog(
         BookingID=booking_id,
         RecipientRole=recipient_role,
@@ -55,6 +56,7 @@ def log_notification(
 
 
 def notify_managers_new_request(db: Session, booking: Booking, driver: User) -> None:
+    """Alert all active Manager/Admin users that a booking needs review."""
     vehicle = booking.vehicle
     link = "/admin/approvals.html"
     subject = f"[GFS Vehicles] New booking request - {vehicle.RegistrationNumber}"
@@ -90,6 +92,7 @@ def notify_employee_decision(
     approved: bool,
     approver: User,
 ) -> None:
+    """Tell the driver about approve (incl. key collection) or reject + reason."""
     vehicle = booking.vehicle
     if approved:
         subject = f"[GFS Vehicles] Booking approved - {vehicle.RegistrationNumber}"
@@ -126,6 +129,7 @@ def notify_employee_decision(
 
 
 def notify_managers_checkin_complete(db: Session, booking: Booking, driver: User) -> None:
+    """Prompt managers that keys should be returned and confirmed in the portal."""
     vehicle = booking.vehicle
     subject = f"[GFS Vehicles] Vehicle returned - key expected - {vehicle.RegistrationNumber}"
     body = (
@@ -151,6 +155,7 @@ def notify_managers_checkin_complete(db: Session, booking: Booking, driver: User
 
 
 def notify_missed_checkout(db: Session, booking: Booking, driver: User) -> None:
+    """Deadline scanner: notify driver + managers that check-out window was missed."""
     vehicle = booking.vehicle
     subject = f"[GFS Vehicles] Missed check-out window - {vehicle.RegistrationNumber}"
     body_employee = (
@@ -188,6 +193,7 @@ def notify_missed_checkout(db: Session, booking: Booking, driver: User) -> None:
 
 
 def notify_overdue_return(db: Session, booking: Booking, driver: User) -> None:
+    """Deadline scanner: notify managers that check-in deadline was missed."""
     vehicle = booking.vehicle
     subject = f"[GFS Vehicles] Overdue return - {vehicle.RegistrationNumber}"
     body = (
@@ -212,6 +218,7 @@ def notify_overdue_return(db: Session, booking: Booking, driver: User) -> None:
 def notify_damage_reported(
     db: Session, booking: Booking, driver: User, *, phase: str = "check-in"
 ) -> None:
+    """Notify managers when damage is noted at check-out or check-in."""
     vehicle = booking.vehicle
     phase_label = "check-out" if phase == "check-out" else "check-in"
     subject = f"[GFS Vehicles] Damage reported - {vehicle.RegistrationNumber}"

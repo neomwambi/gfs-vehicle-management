@@ -1,4 +1,8 @@
-"""SQLAlchemy ORM models."""
+"""SQLAlchemy ORM models for the GFS pool-vehicle domain.
+
+BookingStatus is the central state machine; Vehicle.CurrentStatus is derived from
+open bookings (see services.vehicles.sync_vehicle_status).
+"""
 
 from datetime import datetime
 
@@ -17,6 +21,8 @@ from app.database import Base
 
 
 class User(Base):
+    """Demo / SSO-ready identity. Role gates Manager/Admin vs Employee portals."""
+
     __tablename__ = "Users"
 
     UserID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -29,6 +35,8 @@ class User(Base):
 
 
 class Vehicle(Base):
+    """Pool car. CurrentStatus is Available | Reserved | In Use (synced from bookings)."""
+
     __tablename__ = "Vehicles"
 
     VehicleID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -50,6 +58,14 @@ class Vehicle(Base):
 
 
 class Booking(Base):
+    """Trip request and lifecycle for one driver + vehicle.
+
+    Typical flow:
+      Pending Approval → Approved → (key collected) → Checked Out → Checked In → Closed
+    Branches: Rejected, Cancelled (only while pending), Flagged (missed check-out/in windows).
+    Keys are confirmed by the approving manager; check-out/in require five photo angles.
+    """
+
     __tablename__ = "Bookings"
 
     BookingID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -103,6 +119,8 @@ class Booking(Base):
 
 
 class Incident(Base):
+    """Compliance / damage flag tied to a booking (missed windows, damage, etc.)."""
+
     __tablename__ = "Incidents"
 
     IncidentID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -144,6 +162,8 @@ class TrackerData(Base):
 
 
 class AuditLog(Base):
+    """Append-only trail of meaningful state changes (who/what/when, old vs new)."""
+
     __tablename__ = "AuditLog"
 
     LogID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -157,6 +177,8 @@ class AuditLog(Base):
 
 
 class NotificationsLog(Base):
+    """Simulated outbound email. ApprovalToken reserved for future magic-link approve/reject."""
+
     __tablename__ = "NotificationsLog"
 
     NotificationID: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

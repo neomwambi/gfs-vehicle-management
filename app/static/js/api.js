@@ -1,4 +1,9 @@
-/* GFS shared frontend helpers - loaded by /app and /admin pages */
+/**
+ * GFS shared frontend helpers - loaded by /app and /admin pages.
+ *
+ * Exposes window.GFS: api (fetch + session), formatters, renderHeader, ready().
+ * Auth: session token in localStorage, sent as X-Session-Token on every API call.
+ */
 (function () {
   "use strict";
 
@@ -7,6 +12,7 @@
 
   function formatDt(value) {
     if (!value) return "-";
+    // Naive UTC from API: append Z so the browser treats it as UTC
     var iso = value.endsWith("Z") || value.indexOf("+") >= 0 ? value : value + "Z";
     var d = new Date(iso);
     if (isNaN(d.getTime())) return value;
@@ -30,6 +36,7 @@
     return '<span class="status-pill status-' + safe + '">' + status + "</span>";
   }
 
+  /** Session + authenticated fetch helpers shared by all portal pages. */
   var api = {
     getToken: function () {
       return localStorage.getItem(SESSION_KEY);
@@ -98,6 +105,10 @@
     post: function (path, body) {
       return this.request(path, { method: "POST", body: JSON.stringify(body) });
     },
+    /**
+     * Gate a page: redirect to login if no session; optionally require Manager/Admin.
+     * Returns the user object, or null after redirect.
+     */
     requireAuth: function (opts) {
       opts = opts || {};
       var user = this.getUser();
@@ -114,6 +125,7 @@
     },
   };
 
+  /** Build the top nav HTML for employee (app) or manager (admin) portal. */
   function renderHeader(active, portal) {
     var user = api.getUser();
     var brand =

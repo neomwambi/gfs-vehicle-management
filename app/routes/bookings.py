@@ -1,3 +1,9 @@
+"""Booking APIs: request, approve/reject, keys, check-out/in, cancel.
+
+Thin HTTP layer over app.services.booking. CanApproveNow is computed here so the
+approvals UI can disable Approve when Immediate would fail (vehicle not Available).
+"""
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session, joinedload
 
@@ -18,6 +24,7 @@ router = APIRouter(prefix="/api/bookings", tags=["bookings"])
 
 
 def _out(db: Session, booking: Booking) -> BookingOut:
+    """Serialize booking plus driver/vehicle extras and approval-blocking hints."""
     from datetime import datetime
 
     extras = booking_service._booking_out_extras(db, booking)
@@ -27,6 +34,7 @@ def _out(db: Session, booking: Booking) -> BookingOut:
         status = booking.vehicle.CurrentStatus
         start = booking_service._as_naive_utc(booking.ReservationStart)
         now = datetime.utcnow()
+        # Mirror decide_booking rules so managers see why Approve is disabled
         if booking.BookingType == "Immediate" and status != "Available":
             can_approve = False
             reason = (
@@ -84,6 +92,7 @@ def pending(
     db: Session = Depends(get_db),
     _user: AuthUser = Depends(require_manager),
 ):
+    """Pending queue sorted by borrowing-record band then FIFO (see list_pending_sorted)."""
     return [_out(db, b) for b in booking_service.list_pending_sorted(db)]
 
 
@@ -92,6 +101,7 @@ def awaiting_key_handover(
     db: Session = Depends(get_db),
     user: AuthUser = Depends(require_manager),
 ):
+    """Approved bookings whose keys this manager must still confirm collected."""
     rows = (
         db.query(Booking)
         .options(
@@ -115,6 +125,7 @@ def awaiting_key_return(
     db: Session = Depends(get_db),
     user: AuthUser = Depends(require_manager),
 ):
+    """Checked-in trips waiting for this approver to confirm physical key return → Closed."""
     rows = (
         db.query(Booking)
         .options(
@@ -138,6 +149,7 @@ def active_trips(
     db: Session = Depends(get_db),
     _user: AuthUser = Depends(require_manager),
 ):
+    """In-flight bookings (approved through flagged), not yet Closed/Rejected/Cancelled."""
     rows = (
         db.query(Booking)
         .options(
@@ -182,6 +194,7 @@ def key_collected(
     db: Session = Depends(get_db),
     user: AuthUser = Depends(require_manager),
 ):
+    """Starts the check-out deadline clock (TRIP_WINDOW_HOURS)."""
     return _out(db, booking_service.confirm_key_collected(db, user, booking_id))
 
 
@@ -211,6 +224,7 @@ def key_returned(
     db: Session = Depends(get_db),
     user: AuthUser = Depends(require_manager),
 ):
+    """Closes the booking after check-in when the approving manager confirms keys."""
     return _out(db, booking_service.confirm_key_returned(db, user, booking_id))
 
 

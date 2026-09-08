@@ -4,6 +4,7 @@ Local prototype for Group Forensic Services pool-vehicle booking, approval, key 
 
 - Presenting to management or operations? Use the [stakeholder briefing](docs/GFS-Vehicle-Management-Presentation.md).
 - New to the codebase? Read the [architecture tour](ARCHITECTURE.md) for layers, the booking state machine, key files, and suggested first changes.
+- Learning path / build from scratch? Follow [How to read and build the code](docs/HOW_TO_READ_AND_BUILD.md) — ordered file walkthrough, end-to-end request trace, and a step-by-step rebuild plan.
 
 ## Stack
 

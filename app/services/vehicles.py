@@ -1,4 +1,9 @@
-"""Vehicle status and service-due helpers."""
+"""Vehicle status and service-due helpers.
+
+CurrentStatus is derived from open bookings (not set ad hoc by most flows).
+Midday rule (UTC+2): return before 12:00 → afternoon same day is bookable;
+return at/after 12:00 → next calendar day.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.config import TRIP_WINDOW_HOURS
 from app.models.models import Booking, Vehicle
+from app.timeutil import local_date, to_local, combine_local
 
 ACTIVE_BOOKING_STATUSES = {
     "Pending Approval",
@@ -30,15 +36,18 @@ AFTERNOON_OPEN_HOUR = 12
 
 
 def km_until_service(vehicle: Vehicle) -> int:
+    """Km remaining until LastServiceMileage + ServiceIntervalKm."""
     due_at = vehicle.LastServiceMileage + vehicle.ServiceIntervalKm
     return due_at - vehicle.CurrentMileage
 
 
 def is_service_due_soon(vehicle: Vehicle) -> bool:
+    """True when remaining km is within ServiceAlertThresholdKm."""
     return km_until_service(vehicle) <= vehicle.ServiceAlertThresholdKm
 
 
 def current_holder(db: Session, vehicle_id: int) -> Booking | None:
+    """Latest Approved/Checked Out/Checked In/Flagged booking for display, if any."""
     return (
         db.query(Booking)
         .options(joinedload(Booking.driver))
@@ -76,6 +85,7 @@ def sync_vehicle_status(db: Session, vehicle: Vehicle) -> None:
 
 
 def employee_visible_vehicles(db: Session) -> list[Vehicle]:
+    """Active fleet only (inactive cars stay hidden from the booking UI)."""
     return (
         db.query(Vehicle)
         .filter(Vehicle.IsActive.is_(True))
@@ -106,13 +116,15 @@ def _booking_window(booking: Booking) -> tuple[datetime, datetime | None]:
 
 def free_from_after_return(end: datetime) -> datetime:
     """
-    Midday rule:
-    - Returned before 12:00 → bookable from 12:00 the same day (afternoon).
-    - Returned at/after 12:00 → next calendar day.
+    Midday rule in UTC+2:
+    - Returned before 12:00 local → bookable from 12:00 local the same day (afternoon).
+    - Returned at/after 12:00 local → next local calendar day.
+    Returns naive UTC for storage/comparisons.
     """
-    if end.time() < time(AFTERNOON_OPEN_HOUR, 0):
-        return datetime.combine(end.date(), time(AFTERNOON_OPEN_HOUR, 0))
-    return datetime.combine(end.date() + timedelta(days=1), time(0, 0))
+    local_end = to_local(end)
+    if local_end.time() < time(AFTERNOON_OPEN_HOUR, 0):
+        return combine_local(local_end.date(), time(AFTERNOON_OPEN_HOUR, 0))
+    return combine_local(local_end.date() + timedelta(days=1), time(0, 0))
 
 
 def _mark_dates_for_hold(
@@ -122,16 +134,18 @@ def _mark_dates_for_hold(
     unavailable: set[str],
     afternoon_only: set[str],
 ) -> datetime:
-    """Apply a hold to calendar date sets; return when the car is free after this hold."""
+    """Apply a hold to UTC+2 calendar date sets; return when the car is free after this hold."""
     free_from = free_from_after_return(end)
-    d = start.date()
-    while d < free_from.date():
+    d = local_date(start)
+    free_day = local_date(free_from)
+    while d < free_day:
         unavailable.add(d.isoformat())
         afternoon_only.discard(d.isoformat())
         d += timedelta(days=1)
 
-    if free_from.time() >= time(AFTERNOON_OPEN_HOUR, 0) and free_from.hour == AFTERNOON_OPEN_HOUR:
-        key = free_from.date().isoformat()
+    free_local = to_local(free_from)
+    if free_local.hour == AFTERNOON_OPEN_HOUR and free_local.minute == 0:
+        key = free_local.date().isoformat()
         if key not in unavailable:
             afternoon_only.add(key)
 
@@ -140,9 +154,9 @@ def _mark_dates_for_hold(
 
 def vehicle_availability(db: Session, vehicle: Vehicle) -> dict:
     """
-    NextAvailableFrom uses the midday rule for the current hold.
-    UnavailableDates are fully greyed; AfternoonOnlyDates stay selectable from 12:00.
-    No driver / booking detail is exposed.
+    NextAvailableFrom uses the midday rule (UTC+2) for the current hold.
+    UnavailableDates / AfternoonOnlyDates are YYYY-MM-DD in UTC+2.
+    AfternoonOnlyDates stay selectable from 12:00 local. No driver / booking detail is exposed.
     """
     now = datetime.utcnow()
     rows = (

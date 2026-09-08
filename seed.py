@@ -1,6 +1,10 @@
 """
 Seed / reset the local SQLite database with demo data.
 
+Creates users (Employee / Manager / Admin), three pool vehicles in different
+statuses, live bookings for workflow demos (pending, key handover, overdue
+check-in), and ~6 months of closed trips + incidents for Analytics.
+
 Usage:
   python seed.py --reset
 """
@@ -101,6 +105,7 @@ def _closed_trip(
 
 
 def seed(reset: bool = False) -> None:
+    """Populate empty DB (or wipe+reload when reset=True). No-op if data already exists."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     init_db()

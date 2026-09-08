@@ -1,4 +1,8 @@
-"""GFS Vehicle Management System - FastAPI entrypoint."""
+"""GFS Vehicle Management System - FastAPI entrypoint.
+
+Wires lifespan startup (DB, uploads, deadline scanner), API routers, static/upload
+mounts, and HTML page routes. API auth lives on the routers; HTML pages are public.
+"""
 
 from __future__ import annotations
 
@@ -25,6 +29,9 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """On startup: migrate schema, ensure upload dir, start deadline scanner.
+    On shutdown: signal the scanner to stop and await it.
+    """
     init_db()
     ensure_upload_dir()
     stop = asyncio.Event()
@@ -42,16 +49,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# JSON APIs under /api/*
 app.include_router(auth.router)
 app.include_router(vehicles.router)
 app.include_router(bookings.router)
 app.include_router(admin.router)
 
+# Frontend assets and check-out/in photos
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 
 def _page(name: str) -> FileResponse:
+    """Serve an HTML file from static/; fall back to login if missing."""
     path = STATIC_DIR / name
     if not path.exists():
         return FileResponse(STATIC_DIR / "login.html")
@@ -70,6 +80,7 @@ def login_page():
 
 @app.get("/app/{page_name}")
 def app_pages(page_name: str):
+    """Employee portal pages (vehicles, request, trips, check-out/in)."""
     return _page(f"app/{page_name}")
 
 

@@ -1,3 +1,8 @@
+"""Manager/Admin portal APIs: dashboard counts, incidents, notifications, audit, analytics.
+
+All endpoints require Manager or Admin (require_manager).
+"""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
@@ -23,6 +28,7 @@ def dashboard(
     db: Session = Depends(get_db),
     user: AuthUser = Depends(require_manager),
 ):
+    """Headline ops counts; key queues are scoped to bookings this user approved."""
     open_incidents = db.query(Incident).filter(Incident.ReviewStatus != "Resolved").count()
     vehicles = db.query(Vehicle).filter(Vehicle.IsActive.is_(True)).all()
     nearing = sum(1 for v in vehicles if is_service_due_soon(v))
@@ -178,6 +184,7 @@ def analytics(
     db: Session = Depends(get_db),
     _user: AuthUser = Depends(require_manager),
 ):
+    """Aggregate closed-trip km, incidents, and utilization for the admin charts page."""
     bookings = (
         db.query(Booking)
         .options(joinedload(Booking.driver), joinedload(Booking.vehicle))

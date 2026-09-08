@@ -1,4 +1,9 @@
-"""Pydantic request/response schemas."""
+"""Pydantic request/response schemas.
+
+FastAPI validates incoming JSON against these models before route handlers run
+(types, Literal enums, Field bounds, and custom validators such as photo angles).
+Response models shape what the API returns to the frontend.
+"""
 
 from datetime import datetime
 from typing import Literal
@@ -57,8 +62,8 @@ class VehicleOut(BaseModel):
     CurrentBookingID: int | None = None
     NextAvailableFrom: datetime | None = None
     # Calendar helpers (no booking/driver details)
-    UnavailableDates: list[str] = []  # YYYY-MM-DD fully blocked
-    AfternoonOnlyDates: list[str] = []  # YYYY-MM-DD bookable from 12:00 only
+    UnavailableDates: list[str] = []  # YYYY-MM-DD fully blocked (UTC+2)
+    AfternoonOnlyDates: list[str] = []  # YYYY-MM-DD bookable from 12:00 UTC+2
 
     model_config = {"from_attributes": True}
 

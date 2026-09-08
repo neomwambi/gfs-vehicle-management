@@ -23,6 +23,8 @@ _SESSIONS: dict[str, int] = {}
 
 @dataclass
 class AuthUser:
+    """Request-scoped identity resolved from X-Session-Token."""
+
     UserID: int
     Username: str
     DisplayName: str
@@ -30,10 +32,12 @@ class AuthUser:
 
     @property
     def is_manager_portal(self) -> bool:
+        """Manager and Admin share the same admin portal permissions."""
         return self.Role in ("Manager", "Admin")
 
 
 def create_session(user: User) -> str:
+    """Mint a random token and map it to UserID in process memory (lost on restart)."""
     token = secrets.token_urlsafe(32)
     _SESSIONS[token] = user.UserID
     return token
@@ -54,6 +58,7 @@ def get_user_by_token(db: Session, token: str | None) -> User | None:
 
 
 def login(db: Session, username: str) -> tuple[str, User]:
+    """Username-only demo login; no password. Replace with SSO later."""
     user = db.query(User).filter(User.Username == username, User.IsActive.is_(True)).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unknown or inactive user")
@@ -65,6 +70,7 @@ def get_current_user(
     db: Session = Depends(get_db),
     x_session_token: str | None = Header(default=None, alias=SESSION_HEADER),
 ) -> AuthUser:
+    """FastAPI dependency: require a valid active session token."""
     user = get_user_by_token(db, x_session_token)
     if not user or not user.IsActive:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
@@ -77,6 +83,7 @@ def get_current_user(
 
 
 def require_manager(user: AuthUser = Depends(get_current_user)) -> AuthUser:
+    """FastAPI dependency: Manager or Admin only."""
     if not user.is_manager_portal:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -89,6 +96,7 @@ def optional_user(
     db: Session = Depends(get_db),
     x_session_token: str | None = Header(default=None, alias=SESSION_HEADER),
 ) -> AuthUser | None:
+    """Like get_current_user but returns None instead of 401 (rarely used)."""
     user = get_user_by_token(db, x_session_token)
     if not user or not user.IsActive:
         return None

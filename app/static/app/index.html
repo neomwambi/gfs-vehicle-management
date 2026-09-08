@@ -12,15 +12,15 @@
   <main class="container pb-5">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <div>
-        <h1 class="h4 mb-1">Pool vehicles</h1>
-        <p class="muted mb-0">Availability only - request a car when status is Available.</p>
+        <h1 class="h4 mb-1">Vehicle availability</h1>
+        <p class="muted mb-0">Review the status of GFS pool vehicles and submit a booking request.</p>
       </div>
       <a class="btn btn-sb" href="/app/request.html">Request a car</a>
     </div>
     <div id="list" class="row g-3"></div>
     <p id="err" class="text-danger mt-3"></p>
   </main>
-  <script src="/static/js/api.js?v=2"></script>
+  <script src="/static/js/api.js?v=3"></script>
   <script>
     GFS.ready(function (GFS) {
       var user = GFS.api.requireAuth();
@@ -35,6 +35,15 @@
           return;
         }
         el.innerHTML = vehicles.map(function (v) {
+          var availLine = "";
+          if (v.CurrentStatus === "Available") {
+            availLine = '<div class="small mt-2 text-success">Available now</div>';
+          } else if (v.NextAvailableFrom) {
+            availLine =
+              '<div class="small mt-2"><strong>Next available:</strong> ' +
+              GFS.formatDateLong(v.NextAvailableFrom) + "</div>";
+          }
+          var canImmediate = v.CurrentStatus === "Available";
           return (
             '<div class="col-md-6"><div class="gfs-card h-100">' +
             '<div class="d-flex justify-content-between"><strong>' + v.MakeModel + "</strong>" +
@@ -42,18 +51,18 @@
             '<div class="muted small mt-1">' + v.RegistrationNumber + "</div>" +
             '<div class="mt-2 small">Parking: ' + (v.CurrentParkingLocation || "-") + "</div>" +
             '<div class="small">Mileage: ' + v.CurrentMileage.toLocaleString() + " km</div>" +
-            (v.CurrentStatus !== "Available" && v.CurrentDriverName
-              ? '<div class="small mt-2">With: <strong>' + v.CurrentDriverName + "</strong></div>"
-              : "") +
-            (v.CurrentStatus === "Available"
-              ? '<a class="btn btn-sm btn-sb mt-3" href="/app/request.html?vehicle=' + v.VehicleID + '">Request</a>'
-              : '<button class="btn btn-sm btn-secondary mt-3" disabled>Not bookable</button>') +
+            availLine +
+            '<div class="d-flex flex-wrap gap-2 mt-3">' +
+            (canImmediate
+              ? '<a class="btn btn-sm btn-sb" href="/app/request.html?vehicle=' + v.VehicleID + '">Request now</a>'
+              : '<a class="btn btn-sm btn-sb" href="/app/request.html?vehicle=' + v.VehicleID +
+                '&type=Advance">Reserve for later</a>') +
+            "</div>" +
             "</div></div>"
           );
         }).join("");
       }).catch(function (e) {
         document.getElementById("err").textContent = e.message;
-        if (e.status === 401) window.location.href = "/login.html";
       });
     });
   </script>

@@ -5,42 +5,57 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Request - GFS App</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet" />
+  <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet" />
   <link href="/static/css/theme.css" rel="stylesheet" />
 </head>
 <body>
   <div id="header"></div>
   <main class="container pb-5" style="max-width:640px">
-    <h1 class="h4 mb-3">Request a vehicle</h1>
+    <h1 class="h4 mb-1">Vehicle request</h1>
+    <p class="muted mb-3">Submit a booking request for a GFS pool vehicle. Requests require manager approval.</p>
     <form id="form" class="gfs-card">
       <div class="mb-3">
         <label class="form-label">Booking type</label>
         <select id="type" class="form-select">
-          <option value="Immediate">Immediate (car must be Available now)</option>
-          <option value="Advance Reservation">Advance Reservation (future window)</option>
+          <option value="Immediate">Immediate</option>
+          <option value="Advance Reservation">Advance Reservation</option>
         </select>
-        <div class="form-text" id="typeHint">Immediate requests are only allowed when the vehicle is Available.</div>
+        <div class="form-text" id="typeHint"></div>
       </div>
       <div class="mb-3">
         <label class="form-label">Vehicle</label>
         <select id="vehicle" class="form-select" required></select>
       </div>
-      <div id="advanceFields" class="row g-2 mb-3 d-none">
+      <div id="scheduleFields" class="row g-2 mb-3">
         <div class="col-md-6">
           <label class="form-label">Start</label>
-          <input type="datetime-local" id="start" class="form-control" />
+          <input type="text" id="start" class="form-control" placeholder="Select start date & time" />
         </div>
         <div class="col-md-6">
           <label class="form-label">End</label>
-          <input type="datetime-local" id="end" class="form-control" />
+          <input type="text" id="end" class="form-control" placeholder="Select end date & time" />
         </div>
+        <div class="col-12">
+          <div class="form-text" id="scheduleHint"></div>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Case number</label>
+        <input id="caseNumber" class="form-control" required placeholder="e.g. GFS-2044" />
       </div>
       <div class="mb-3">
         <label class="form-label">Purpose / Reason</label>
         <textarea id="purpose" class="form-control" rows="2" required></textarea>
       </div>
-      <div class="mb-3">
+      <div class="mb-3 destination-field">
         <label class="form-label">Destination</label>
-        <input id="destination" class="form-control" required />
+        <input id="destination" class="form-control" required placeholder="Search for an address or place" autocomplete="off" />
+        <ul id="destinationSuggestions" class="destination-suggestions d-none" role="listbox"></ul>
+        <div class="form-text" id="destinationHint">Start typing to search South African addresses (OpenStreetMap / Photon).</div>
+        <div id="destinationMap" class="destination-map mt-2 d-none" aria-label="Selected destination map"></div>
+        <input type="hidden" id="destinationLat" />
+        <input type="hidden" id="destinationLng" />
       </div>
       <button class="btn btn-sb" type="submit">Submit request</button>
       <p id="msg" class="small mt-3 mb-0"></p>
@@ -65,7 +80,9 @@
     </div>
   </div>
 
-  <script src="/static/js/api.js?v=2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/js/api.js?v=3"></script>
   <script>
     GFS.ready(function (GFS) {
     var api = GFS.api, renderHeader = GFS.renderHeader, wireLogout = GFS.wireLogout;
@@ -75,30 +92,158 @@
 
     const params = new URLSearchParams(location.search);
     const preselect = params.get("vehicle");
+    const typeParam = params.get("type");
     let allVehicles = [];
+    let startPicker = null;
+    let endPicker = null;
+
+    if (typeParam && typeParam.toLowerCase().indexOf("advance") === 0) {
+      document.getElementById("type").value = "Advance Reservation";
+    }
+
+    function ymdLocal(d) {
+      var y = d.getFullYear();
+      var m = String(d.getMonth() + 1).padStart(2, "0");
+      var day = String(d.getDate()).padStart(2, "0");
+      return y + "-" + m + "-" + day;
+    }
+
+    function selectedVehicle() {
+      var id = document.getElementById("vehicle").value;
+      return allVehicles.find(function (x) { return String(x.VehicleID) === String(id); });
+    }
+
+    function destroyPickers() {
+      if (startPicker) { startPicker.destroy(); startPicker = null; }
+      if (endPicker) { endPicker.destroy(); endPicker = null; }
+      document.getElementById("start").value = "";
+      document.getElementById("end").value = "";
+    }
+
+    function minTimeForDate(dateObj, vehicle) {
+      var key = ymdLocal(dateObj);
+      var afternoon = (vehicle && vehicle.AfternoonOnlyDates) || [];
+      if (afternoon.indexOf(key) >= 0) return "12:00";
+      return "00:00";
+    }
+
+    function setupPickers() {
+      destroyPickers();
+      var vehicle = selectedVehicle();
+      if (!vehicle) return;
+
+      var type = document.getElementById("type").value;
+      var isImmediate = type === "Immediate";
+      var unavailable = {};
+      (vehicle.UnavailableDates || []).forEach(function (d) { unavailable[d] = true; });
+      var now = new Date();
+      var todayKey = ymdLocal(now);
+
+      function applyAfternoonMin(selectedDates, instance) {
+        if (!selectedDates.length || !vehicle) return;
+        var minT = minTimeForDate(selectedDates[0], vehicle);
+        instance.set("minTime", minT);
+        if (minT === "12:00" && selectedDates[0].getHours() < 12) {
+          selectedDates[0].setHours(12, 0, 0, 0);
+          instance.setDate(selectedDates[0], false);
+        }
+      }
+
+      if (isImmediate) {
+        // Start: today auto-filled and shown; picker is time-only (date locked)
+        startPicker = flatpickr("#start", {
+          enableTime: true,
+          noCalendar: true,
+          time_24hr: true,
+          minuteIncrement: 15,
+          dateFormat: "Y-m-d H:i",
+          defaultDate: now,
+          allowInput: false,
+        });
+
+        // End: full date + time (user sets both)
+        endPicker = flatpickr("#end", {
+          enableTime: true,
+          time_24hr: true,
+          minuteIncrement: 15,
+          minDate: "today",
+          dateFormat: "Y-m-d H:i",
+          defaultDate: null,
+          disable: [
+            function (date) {
+              return !!unavailable[ymdLocal(date)];
+            },
+          ],
+          onChange: function (selectedDates, _str, instance) {
+            applyAfternoonMin(selectedDates, instance);
+          },
+        });
+
+        document.getElementById("typeHint").textContent =
+          "For vehicles that are available now. Start is set to today; adjust the start time and select your end date and time.";
+        document.getElementById("scheduleHint").textContent =
+          "Start is set to today (adjust the time only). End date and time must be set before you submit the request.";
+        return;
+      }
+
+      var common = {
+        enableTime: true,
+        time_24hr: true,
+        minuteIncrement: 15,
+        minDate: "today",
+        dateFormat: "Y-m-d H:i",
+        onChange: function (selectedDates, _str, instance) {
+          applyAfternoonMin(selectedDates, instance);
+        },
+      };
+
+      startPicker = flatpickr("#start", Object.assign({}, common, {
+        disable: [
+          function (date) {
+            return !!unavailable[ymdLocal(date)];
+          },
+        ],
+      }));
+
+      endPicker = flatpickr("#end", Object.assign({}, common, {
+        disable: [
+          function (date) {
+            return !!unavailable[ymdLocal(date)];
+          },
+        ],
+      }));
+
+      document.getElementById("typeHint").textContent =
+        "For a future trip. You may book a vehicle that is currently in use or reserved, for a later free period.";
+      document.getElementById("scheduleHint").textContent =
+        "Unavailable dates are shown in grey. If a vehicle is due back before midday, the afternoon of that day may still be selected.";
+    }
 
     function fillVehicles() {
       const type = document.getElementById("type").value;
       const sel = document.getElementById("vehicle");
-      const hint = document.getElementById("typeHint");
       let list;
       if (type === "Immediate") {
         list = allVehicles.filter(v => v.CurrentStatus === "Available");
-        hint.textContent = "Immediate: only Available vehicles are listed. If both cars are out, use Advance Reservation.";
       } else {
         list = allVehicles.slice();
-        hint.textContent = "Advance: you may reserve a car that is currently In Use / Reserved for a future start time after it returns.";
       }
       if (!list.length) {
-        sel.innerHTML = `<option value="">No vehicles match this booking type</option>`;
+        sel.innerHTML = `<option value="">No vehicles available for this booking type</option>`;
+        destroyPickers();
         return;
       }
-      sel.innerHTML = list.map(v =>
-        `<option value="${v.VehicleID}">${v.MakeModel} (${v.RegistrationNumber}) - ${v.CurrentStatus}</option>`
-      ).join("");
+      sel.innerHTML = list.map(v => {
+        var label = v.MakeModel + " (" + v.RegistrationNumber + ")";
+        if (type !== "Immediate") {
+          label += " · " + v.CurrentStatus;
+        }
+        return `<option value="${v.VehicleID}">${label}</option>`;
+      }).join("");
       if (preselect && list.some(v => String(v.VehicleID) === String(preselect))) {
         sel.value = preselect;
       }
+      setupPickers();
     }
 
     api.get("/api/vehicles").then(vehicles => {
@@ -106,16 +251,160 @@
       fillVehicles();
     });
 
-    document.getElementById("type").addEventListener("change", (e) => {
-      const advance = e.target.value === "Advance Reservation";
-      document.getElementById("advanceFields").classList.toggle("d-none", !advance);
-      fillVehicles();
-    });
+    // Photon (OSM) search + Leaflet map — South Africa only
+    var destinationMap = null;
+    var destinationMarker = null;
+    var photonTimer = null;
+    var photonAbort = null;
+    // Bias toward Cape Town; hard-limit search to SA mainland bbox
+    var CT_LAT = -33.9249;
+    var CT_LON = 18.4241;
+    var SA_BBOX = "16.45,-34.84,32.95,-22.12"; // minLon,minLat,maxLon,maxLat
+
+    function isSouthAfricaFeature(feature) {
+      var props = (feature && feature.properties) || {};
+      var code = String(props.countrycode || "").toUpperCase();
+      if (code === "ZA") return true;
+      var country = String(props.country || "").toLowerCase();
+      if (country === "south africa" || country === "republic of south africa") return true;
+      var coords = feature.geometry && feature.geometry.coordinates;
+      if (!coords || coords.length < 2) return false;
+      // Fallback: inside SA bbox and not labelled as another country
+      if (code && code !== "ZA") return false;
+      var lon = coords[0];
+      var lat = coords[1];
+      return lon >= 16.45 && lon <= 32.95 && lat >= -34.84 && lat <= -22.12 && !code;
+    }
+
+    function formatPhotonLabel(props) {
+      var parts = [];
+      if (props.name) parts.push(props.name);
+      var street = [props.housenumber, props.street].filter(Boolean).join(" ");
+      if (street && street !== props.name) parts.push(street);
+      [props.suburb, props.city, props.district, props.county, props.state, props.country]
+        .filter(Boolean)
+        .forEach(function (p) {
+          if (parts.indexOf(p) === -1) parts.push(p);
+        });
+      return parts.join(", ") || "Selected location";
+    }
+
+    function hideDestinationSuggestions() {
+      var list = document.getElementById("destinationSuggestions");
+      list.classList.add("d-none");
+      list.innerHTML = "";
+    }
+
+    function showDestinationOnMap(lat, lng) {
+      var mapEl = document.getElementById("destinationMap");
+      if (!window.L || !mapEl) return;
+      mapEl.classList.remove("d-none");
+      if (!destinationMap) {
+        destinationMap = L.map(mapEl, { scrollWheelZoom: false }).setView([lat, lng], 15);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        }).addTo(destinationMap);
+        destinationMarker = L.marker([lat, lng]).addTo(destinationMap);
+      } else {
+        destinationMap.setView([lat, lng], 15);
+        destinationMarker.setLatLng([lat, lng]);
+      }
+      setTimeout(function () {
+        destinationMap.invalidateSize();
+      }, 50);
+      document.getElementById("destinationLat").value = String(lat);
+      document.getElementById("destinationLng").value = String(lng);
+    }
+
+    function selectPhotonPlace(feature) {
+      if (!isSouthAfricaFeature(feature)) return;
+      var coords = feature.geometry && feature.geometry.coordinates;
+      if (!coords || coords.length < 2) return;
+      var lng = coords[0];
+      var lat = coords[1];
+      var label = formatPhotonLabel(feature.properties || {});
+      document.getElementById("destination").value = label;
+      hideDestinationSuggestions();
+      showDestinationOnMap(lat, lng);
+    }
+
+    function renderPhotonSuggestions(features) {
+      var list = document.getElementById("destinationSuggestions");
+      list.innerHTML = "";
+      var za = (features || []).filter(isSouthAfricaFeature).slice(0, 6);
+      if (!za.length) {
+        list.classList.add("d-none");
+        return;
+      }
+      za.forEach(function (f) {
+        var li = document.createElement("li");
+        li.setAttribute("role", "option");
+        li.textContent = formatPhotonLabel(f.properties || {});
+        li.addEventListener("mousedown", function (e) {
+          e.preventDefault();
+          selectPhotonPlace(f);
+        });
+        list.appendChild(li);
+      });
+      list.classList.remove("d-none");
+    }
+
+    function searchPhoton(query) {
+      if (photonAbort) photonAbort.abort();
+      photonAbort = new AbortController();
+      var url =
+        "https://photon.komoot.io/api/?q=" +
+        encodeURIComponent(query) +
+        "&limit=15&lang=en&lat=" +
+        CT_LAT +
+        "&lon=" +
+        CT_LON +
+        "&bbox=" +
+        encodeURIComponent(SA_BBOX);
+      fetch(url, { signal: photonAbort.signal })
+        .then(function (r) {
+          if (!r.ok) throw new Error("Search failed");
+          return r.json();
+        })
+        .then(function (data) {
+          renderPhotonSuggestions(data.features || []);
+        })
+        .catch(function (err) {
+          if (err.name === "AbortError") return;
+          hideDestinationSuggestions();
+        });
+    }
+
+    (function initDestinationPhoton() {
+      var input = document.getElementById("destination");
+      input.addEventListener("input", function () {
+        document.getElementById("destinationLat").value = "";
+        document.getElementById("destinationLng").value = "";
+        var q = input.value.trim();
+        if (photonTimer) clearTimeout(photonTimer);
+        if (q.length < 3) {
+          hideDestinationSuggestions();
+          return;
+        }
+        photonTimer = setTimeout(function () {
+          searchPhoton(q);
+        }, 280);
+      });
+      input.addEventListener("blur", function () {
+        setTimeout(hideDestinationSuggestions, 150);
+      });
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") hideDestinationSuggestions();
+      });
+    })();
+
+    document.getElementById("type").addEventListener("change", fillVehicles);
+    document.getElementById("vehicle").addEventListener("change", setupPickers);
 
     function showSuccessPopup(bookingId) {
       document.getElementById("popupRef").textContent = "Reference: Booking #" + bookingId;
-      const popup = document.getElementById("successPopup");
-      popup.classList.add("show");
+      document.getElementById("successPopup").classList.add("show");
     }
 
     function hideSuccessPopup() {
@@ -133,27 +422,35 @@
       msg.textContent = "";
       msg.className = "small mt-3 mb-0";
       const type = document.getElementById("type").value;
+      const startDates = startPicker ? startPicker.selectedDates : [];
+      const endDates = endPicker ? endPicker.selectedDates : [];
+      if (!startDates.length || !endDates.length) {
+        msg.classList.add("text-danger");
+        msg.textContent = "Start and End date/time are required.";
+        return;
+      }
+      if (endDates[0] <= startDates[0]) {
+        msg.classList.add("text-danger");
+        msg.textContent = "End must be after Start.";
+        return;
+      }
       const body = {
         VehicleID: Number(document.getElementById("vehicle").value),
         BookingType: type,
         PurposeReason: document.getElementById("purpose").value,
         Destination: document.getElementById("destination").value,
+        CaseNumber: document.getElementById("caseNumber").value,
+        ReservationStart: startDates[0].toISOString(),
+        ReservationEnd: endDates[0].toISOString(),
       };
-      if (type === "Advance Reservation") {
-        const startVal = document.getElementById("start").value;
-        const endVal = document.getElementById("end").value;
-        if (!startVal || !endVal) {
-          msg.classList.add("text-danger");
-          msg.textContent = "Start and End are required for Advance Reservation.";
-          return;
-        }
-        body.ReservationStart = new Date(startVal).toISOString();
-        body.ReservationEnd = new Date(endVal).toISOString();
-      }
       try {
         const b = await api.post("/api/bookings", body);
         e.target.reset();
-        document.getElementById("advanceFields").classList.add("d-none");
+        document.getElementById("type").value = "Immediate";
+        document.getElementById("destinationLat").value = "";
+        document.getElementById("destinationLng").value = "";
+        document.getElementById("destinationMap").classList.add("d-none");
+        destroyPickers();
         fillVehicles();
         showSuccessPopup(b.BookingID);
       } catch (err) {

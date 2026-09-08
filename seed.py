@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from datetime import datetime, timedelta
 
 from app.config import DATA_DIR, TRIP_WINDOW_HOURS, UPLOAD_DIR
@@ -61,6 +62,7 @@ def _closed_trip(
     hours: float = 3.0,
     damage: str | None = None,
     bay: str = "GFS Basement Bay A1",
+    case_number: str = "GFS-0000",
 ) -> Booking:
     """Historical closed booking for analytics / incident demos."""
     duration = timedelta(hours=hours)
@@ -69,9 +71,10 @@ def _closed_trip(
         DriverID=driver_id,
         BookingType=booking_type,
         ReservationStart=start,
-        ReservationEnd=start + duration if booking_type == "Advance Reservation" else None,
+        ReservationEnd=start + duration if booking_type == "Advance Reservation" else start + duration,
         PurposeReason=purpose,
         Destination=destination,
+        CaseNumber=case_number,
         BookingStatus="Closed",
         RequestedAt=start - timedelta(hours=2),
         ApprovedBy=approver_id,
@@ -211,6 +214,7 @@ def seed(reset: bool = False) -> None:
             ReservationEnd=now + timedelta(days=1, hours=4),
             PurposeReason="Urgent follow-up interview",
             Destination="Wynberg SAPS",
+            CaseNumber="GFS-2101",
             BookingStatus="Pending Approval",
             RequestedAt=now - timedelta(minutes=40),
         )
@@ -224,6 +228,7 @@ def seed(reset: bool = False) -> None:
             ReservationEnd=now + timedelta(hours=3),
             PurposeReason="Witness interview travel",
             Destination="Bellville Forensic Offices",
+            CaseNumber="GFS-2102",
             BookingStatus="Approved",
             RequestedAt=now - timedelta(hours=4),
             ApprovedBy=nishen.UserID,
@@ -239,6 +244,7 @@ def seed(reset: bool = False) -> None:
             ReservationStart=now - timedelta(hours=2),
             PurposeReason="Scene attendance - case GFS-2044",
             Destination="Athlone",
+            CaseNumber="GFS-2044",
             BookingStatus="Checked Out",
             RequestedAt=now - timedelta(hours=3),
             ApprovedBy=nishen.UserID,
@@ -264,6 +270,7 @@ def seed(reset: bool = False) -> None:
             ReservationStart=now - timedelta(days=5),
             PurposeReason="Evidence transport to archive",
             Destination="GFS Secure Archive, Century City",
+            CaseNumber="GFS-1990",
             BookingStatus="Closed",
             RequestedAt=now - timedelta(days=5, hours=2),
             ApprovedBy=nishen.UserID,
@@ -291,6 +298,7 @@ def seed(reset: bool = False) -> None:
             ReservationStart=now - timedelta(days=12),
             PurposeReason="Field verification - insurance claim",
             Destination="Mitchells Plain",
+            CaseNumber="GFS-1975",
             BookingStatus="Closed",
             RequestedAt=now - timedelta(days=12, hours=1),
             ApprovedBy=nishen.UserID,
@@ -320,6 +328,7 @@ def seed(reset: bool = False) -> None:
             ReservationEnd=now - timedelta(days=2) + timedelta(hours=4),
             PurposeReason="Personal errand",
             Destination="Canal Walk",
+            CaseNumber="GFS-1988",
             BookingStatus="Rejected",
             RequestedAt=now - timedelta(days=2, hours=3),
             ApprovedBy=nishen.UserID,
@@ -368,6 +377,8 @@ def seed(reset: bool = False) -> None:
                 if vehicle is v2
                 else "GFS Basement Bay A3"
             )
+            match = re.search(r"GFS-\d+", purpose)
+            case_number = match.group(0) if match else f"GFS-{1800 + int(days_ago)}"
             hist_bookings.append(
                 _closed_trip(
                     vehicle_id=vehicle.VehicleID,
@@ -382,6 +393,7 @@ def seed(reset: bool = False) -> None:
                     hours=hours,
                     damage=damage,
                     bay=bay,
+                    case_number=case_number,
                 )
             )
 
@@ -394,6 +406,7 @@ def seed(reset: bool = False) -> None:
             ReservationEnd=now - timedelta(days=20) + timedelta(hours=3),
             PurposeReason="Site visit cancelled by requester",
             Destination="Bellville",
+            CaseNumber="GFS-2055",
             BookingStatus="Cancelled",
             RequestedAt=now - timedelta(days=21),
             ApprovedBy=None,
@@ -405,6 +418,7 @@ def seed(reset: bool = False) -> None:
             ReservationStart=now - timedelta(days=9),
             PurposeReason="Weekend personal use",
             Destination="Waterfront",
+            CaseNumber="GFS-2060",
             BookingStatus="Rejected",
             RequestedAt=now - timedelta(days=9, hours=2),
             ApprovedBy=nishen.UserID,
@@ -547,7 +561,8 @@ def seed(reset: bool = False) -> None:
             subject=f"[GFS Vehicles] New booking request - {v1.RegistrationNumber}",
             body=(
                 f"Hello,\n\n{omphile.DisplayName} has requested {v1.MakeModel} ({v1.RegistrationNumber}).\n"
-                f"Purpose: {b_pending.PurposeReason}\nDestination: {b_pending.Destination}\n\n"
+                f"Purpose: {b_pending.PurposeReason}\nDestination: {b_pending.Destination}\n"
+                f"Case number: {b_pending.CaseNumber}\n\n"
                 f"Please review and approve or reject in the Admin portal:\n"
                 f"  /admin/approvals.html\n"
             ),

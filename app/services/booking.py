@@ -131,7 +131,7 @@ def request_booking(db: Session, user: AuthUser, payload: BookingRequestCreate) 
     now = datetime.utcnow()
 
     if payload.BookingType == "Immediate":
-        # Immediate = need the car now - must be free
+        # Immediate = need the car now - must be free; start today, end optional
         if vehicle.CurrentStatus != "Available":
             raise HTTPException(
                 status_code=400,
@@ -153,8 +153,30 @@ def request_booking(db: Session, user: AuthUser, payload: BookingRequestCreate) 
                 status_code=400,
                 detail="Vehicle already has an active approved or in-progress booking",
             )
-        start = now
-        end = None
+        start = _as_naive_utc(payload.ReservationStart)
+        end = _as_naive_utc(payload.ReservationEnd)
+        assert start is not None and end is not None
+        if start.date() > now.date():
+            raise HTTPException(
+                status_code=400,
+                detail="Immediate start must be today. Use Advance Reservation for a future day.",
+            )
+        if start.date() < now.date():
+            start = datetime.combine(now.date(), start.time())
+        if end <= start:
+            raise HTTPException(status_code=400, detail="ReservationEnd must be after ReservationStart")
+        # Planned end only - actual return is when the driver checks in
+        overlap = _has_overlapping_hold(
+            db, vehicle_id=vehicle.VehicleID, start=start, end=end
+        )
+        if overlap:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"That time window overlaps another booking "
+                    f"(#{overlap.BookingID}, {overlap.BookingStatus}). Choose a different slot."
+                ),
+            )
     else:
         # Advance Reservation = future window only; may request while car is currently out
         start = _as_naive_utc(payload.ReservationStart)
@@ -185,6 +207,7 @@ def request_booking(db: Session, user: AuthUser, payload: BookingRequestCreate) 
         ReservationEnd=end,
         PurposeReason=payload.PurposeReason.strip(),
         Destination=payload.Destination.strip(),
+        CaseNumber=payload.CaseNumber.strip(),
         BookingStatus="Pending Approval",
         RequestedAt=now,
     )
@@ -203,6 +226,7 @@ def request_booking(db: Session, user: AuthUser, payload: BookingRequestCreate) 
             "VehicleID": booking.VehicleID,
             "PurposeReason": booking.PurposeReason,
             "Destination": booking.Destination,
+            "CaseNumber": booking.CaseNumber,
             "ReservationStart": start.isoformat(),
             "ReservationEnd": end.isoformat() if end else None,
         },

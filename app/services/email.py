@@ -63,6 +63,7 @@ def notify_managers_new_request(db: Session, booking: Booking, driver: User) -> 
         f"{driver.DisplayName} has requested {vehicle.MakeModel} ({vehicle.RegistrationNumber}).\n\n"
         f"Purpose: {booking.PurposeReason}\n"
         f"Destination: {booking.Destination}\n"
+        f"Case number: {booking.CaseNumber or '-'}\n"
         f"Type: {booking.BookingType}\n"
         f"Start: {booking.ReservationStart}\n\n"
         f"Please review and approve or reject in the Admin portal:\n"

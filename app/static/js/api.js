@@ -13,6 +13,18 @@
     return d.toLocaleString();
   }
 
+  function formatDateLong(value) {
+    if (!value) return "-";
+    var iso = String(value).endsWith("Z") || String(value).indexOf("+") >= 0 ? value : value + "Z";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return value;
+    var months = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December",
+    ];
+    return d.getDate() + " " + months[d.getMonth()] + " " + d.getFullYear();
+  }
+
   function statusPill(status) {
     var safe = String(status).replace(/\s+/g, "-");
     return '<span class="status-pill status-' + safe + '">' + status + "</span>";
@@ -184,6 +196,7 @@
   window.GFS = {
     api: api,
     formatDt: formatDt,
+    formatDateLong: formatDateLong,
     statusPill: statusPill,
     renderHeader: renderHeader,
     wireLogout: wireLogout,

@@ -61,6 +61,7 @@ class Booking(Base):
     ReservationEnd: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     PurposeReason: Mapped[str] = mapped_column(Text, nullable=False)
     Destination: Mapped[str] = mapped_column(String(256), nullable=False)
+    CaseNumber: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     BookingStatus: Mapped[str] = mapped_column(String(64), nullable=False, default="Pending Approval")
     # Pending Approval | Approved | Rejected | Checked Out | Checked In | Flagged | Closed | Cancelled
     RequestedAt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)

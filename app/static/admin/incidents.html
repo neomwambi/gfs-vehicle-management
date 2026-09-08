@@ -100,7 +100,7 @@
           <td>${i.VehicleReg || ""}</td>
           <td class="small">${formatDt(i.RaisedOn)}</td>
           <td>${statusBadge(i.ReviewStatus)}</td>
-          <td class="small muted" style="max-width:220px">${i.ResolutionNotes || "—"}</td>
+          <td class="small muted" style="max-width:220px">${i.ResolutionNotes || "-"}</td>
           <td>
             ${i.ReviewStatus === "Resolved"
               ? `<button class="btn btn-sm btn-sb-outline" onclick="review(${i.IncidentID})">Re-open / edit</button>`

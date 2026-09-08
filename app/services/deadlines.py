@@ -122,6 +122,7 @@ def process_deadlines(db: Session) -> int:
 
 
 async def deadline_loop(stop_event: asyncio.Event) -> None:
+    """Background loop: process_deadlines every DEADLINE_CHECK_INTERVAL_SECONDS until stop."""
     logger.info("Deadline scanner started (every %ss)", DEADLINE_CHECK_INTERVAL_SECONDS)
     while not stop_event.is_set():
         try:

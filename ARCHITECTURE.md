@@ -14,6 +14,8 @@ Start on the employee request vertical slice:
 
 That path teaches routing, validation, conflict checks, audit, and the simulated email log without touching Azure cutover stubs.
 
+**Full learning path** (read order + build-from-scratch steps): [docs/HOW_TO_READ_AND_BUILD.md](docs/HOW_TO_READ_AND_BUILD.md).
+
 ## How to run
 
 From the repo root, create a venv, install deps, seed demo users, then start Uvicorn. Open http://127.0.0.1:8000/login.html and pick a demo user (no password). Manager `nishen` and Admin `neo` share `/admin` permissions.

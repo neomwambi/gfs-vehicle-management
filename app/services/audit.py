@@ -29,6 +29,7 @@ def write_audit(
     old_value: Any = None,
     new_value: Any = None,
 ) -> AuditLog:
+    """Append one audit row. changed_by=None means system (e.g. deadline scanner)."""
     entry = AuditLog(
         TableName=table_name,
         RecordID=record_id,

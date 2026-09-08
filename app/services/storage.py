@@ -14,6 +14,7 @@ _DATA_URL_RE = re.compile(r"^data:image/(png|jpeg|jpg|webp);base64,(.+)$", re.IG
 
 
 def ensure_upload_dir() -> Path:
+    """Create uploads/ if missing (called from app lifespan)."""
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     return UPLOAD_DIR
 

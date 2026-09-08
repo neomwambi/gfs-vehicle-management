@@ -1,4 +1,12 @@
-"""Booking workflow: request, approve, keys, check-out/in, cancel."""
+"""Booking workflow: request, approve, keys, check-out/in, cancel.
+
+Business rules worth knowing:
+- Immediate requires the vehicle Available now; Advance may book while it is out.
+- Calendar overlap only considers Pending/Approved holds (not Checked Out).
+- Approving auto-rejects conflicting pending requests (first-come).
+- Only the approving manager confirms key collected/returned; that starts deadlines.
+- Flagged bookings can still check out/in after a missed window.
+"""
 
 from __future__ import annotations
 
@@ -21,6 +29,7 @@ from app.services.audit import write_audit
 from app.services.auth import AuthUser
 from app.services.storage import save_photo
 from app.services.vehicles import sync_vehicle_status
+from app.timeutil import align_immediate_start
 
 
 def _as_naive_utc(dt: datetime | None) -> datetime | None:
@@ -124,6 +133,7 @@ def get_booking(db: Session, booking_id: int) -> Booking:
 
 
 def request_booking(db: Session, user: AuthUser, payload: BookingRequestCreate) -> Booking:
+    """Create a Pending Approval booking after Immediate/Advance validation."""
     vehicle = db.get(Vehicle, payload.VehicleID)
     if not vehicle or not vehicle.IsActive:
         raise HTTPException(status_code=400, detail="Vehicle not found or inactive")
@@ -156,13 +166,13 @@ def request_booking(db: Session, user: AuthUser, payload: BookingRequestCreate) 
         start = _as_naive_utc(payload.ReservationStart)
         end = _as_naive_utc(payload.ReservationEnd)
         assert start is not None and end is not None
-        if start.date() > now.date():
+        try:
+            start = align_immediate_start(start, now)
+        except ValueError:
             raise HTTPException(
                 status_code=400,
                 detail="Immediate start must be today. Use Advance Reservation for a future day.",
             )
-        if start.date() < now.date():
-            start = datetime.combine(now.date(), start.time())
         if end <= start:
             raise HTTPException(status_code=400, detail="ReservationEnd must be after ReservationStart")
         # Planned end only - actual return is when the driver checks in
@@ -241,6 +251,7 @@ def request_booking(db: Session, user: AuthUser, payload: BookingRequestCreate) 
 
 
 def cancel_booking(db: Session, user: AuthUser, booking_id: int) -> Booking:
+    """Driver or manager may cancel only while still Pending Approval."""
     booking = get_booking(db, booking_id)
     if booking.DriverID != user.UserID and not user.is_manager_portal:
         raise HTTPException(status_code=403, detail="Cannot cancel another user's booking")
@@ -265,6 +276,7 @@ def cancel_booking(db: Session, user: AuthUser, booking_id: int) -> Booking:
 
 
 def decide_booking(db: Session, user: AuthUser, booking_id: int, payload: BookingDecision) -> Booking:
+    """Approve or reject. On approve: set Reserved if free, auto-reject conflicting pendings."""
     if not user.is_manager_portal:
         raise HTTPException(status_code=403, detail="Manager or Admin role required")
 
@@ -417,6 +429,7 @@ def decide_booking(db: Session, user: AuthUser, booking_id: int, payload: Bookin
 
 
 def confirm_key_collected(db: Session, user: AuthUser, booking_id: int) -> Booking:
+    """Physical key handover by the approver; sets CheckOutDeadline = now + TRIP_WINDOW_HOURS."""
     if not user.is_manager_portal:
         raise HTTPException(status_code=403, detail="Manager or Admin role required")
     booking = get_booking(db, booking_id)
@@ -453,6 +466,7 @@ def confirm_key_collected(db: Session, user: AuthUser, booking_id: int) -> Booki
 
 
 def check_out(db: Session, user: AuthUser, booking_id: int, payload: CheckOutRequest) -> Booking:
+    """Driver starts trip after keys confirmed; vehicle → In Use; starts CheckInDeadline."""
     booking = get_booking(db, booking_id)
     if booking.DriverID != user.UserID:
         raise HTTPException(status_code=403, detail="Only the assigned driver can check out")
@@ -544,6 +558,7 @@ def check_out(db: Session, user: AuthUser, booking_id: int, payload: CheckOutReq
 
 
 def check_in(db: Session, user: AuthUser, booking_id: int, payload: CheckInRequest) -> Booking:
+    """Driver ends trip; mileage must not decrease; vehicle status re-synced; managers notified."""
     booking = get_booking(db, booking_id)
     if booking.DriverID != user.UserID:
         raise HTTPException(status_code=403, detail="Only the assigned driver can check in")
@@ -628,6 +643,7 @@ def check_in(db: Session, user: AuthUser, booking_id: int, payload: CheckInReque
 
 
 def confirm_key_returned(db: Session, user: AuthUser, booking_id: int) -> Booking:
+    """Approver confirms keys back → Closed; frees vehicle if no other open holds."""
     if not user.is_manager_portal:
         raise HTTPException(status_code=403, detail="Manager or Admin role required")
     booking = get_booking(db, booking_id)
